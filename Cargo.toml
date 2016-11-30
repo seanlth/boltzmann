@@ -1,0 +1,10 @@
+[package]
+name = "boltzmann"
+version = "0.1.0"
+authors = ["hargados <hargados@tcd.ie>"]
+
+[dependencies]
+piston_window = "0.52.0"
+pistoncore-sdl2_window = "0.34.0"
+piston2d-opengl_graphics = "0.32.0"
+rand = "0.3"
