@@ -10,8 +10,10 @@ use piston_window::*;
 
 fn main() {
 
-    let mut s = Simulator::new(10, 10.0, 600, 400, 0.01);
-    loop { s.draw() } ;
+    let mut s = Simulator::new(2, 10.0, 400, 400, 0.01);
+
+    let mut i = 0;
+    loop { s.draw(); if i % 20 == 0 {  } i += 1; } ;
 
     // let mut window: PistonWindow =
     //     WindowSettings::new("Hello Piston!", [640, 480])
