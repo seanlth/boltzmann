@@ -56,8 +56,8 @@ impl Simulator {
             // random positions and velocities
             let p_x = (rand::random::<u32>() % width) as f64;
             let p_y = (rand::random::<u32>() % height) as f64;
-            let v_x = (rand::random::<u32>() % 10) as f64;
-            let v_y = (rand::random::<u32>() % 10) as f64;
+            let v_x = (rand::random::<u32>() % 50) as f64;
+            let v_y = (rand::random::<u32>() % 50) as f64;
 
             particles.push( Particle::new( Vector::new(p_x, height as f64 - p_y ), Vector::new(v_x, v_y), dt) )
         }
@@ -73,8 +73,18 @@ impl Simulator {
         }
     }
 
+
+    pub fn velociies(&self) -> Vec<f64> {
+        let mut vs = Vec::new();
+        for p in &self.particles {
+            let v = p.get_velocity();
+            vs.push(v.magnitude());
+        }
+        vs
+    }
+
     // total engery in system
-    pub fn total_energy(&mut self) -> f64 {
+    pub fn total_energy(&self) -> f64 {
         let mut energy = 0.0;
         for p in &self.particles {
             let v = p.get_velocity();
@@ -152,7 +162,7 @@ impl Simulator {
             }
             if position.y - self.radius < 0.0 {
                 p.set_position( Vector::new( position.x, self.radius ) );
-                p.set_velocity( Vector::new( velocity.x * 0.5, -velocity.y * 0.5 ) );
+                p.set_velocity( Vector::new( velocity.x, -velocity.y ) );
             }
             if position.y + self.radius > self.height as f64 {
                 p.set_position( Vector::new( position.x, self.height as f64 - self.radius ) );
@@ -187,13 +197,12 @@ impl Simulator {
         self.solve_collisions();
         self.boundary_check();
 
-        if self.gravity != 0.0 {
-            
-            // apply gravity
-            for p in &mut self.particles {
-                p.verlet( Vector::new(0.0, self.gravity) );
-            }
+
+        // apply gravity
+        for p in &mut self.particles {
+            p.verlet( Vector::new(0.0, self.gravity) );
         }
+
     }
 
 }
