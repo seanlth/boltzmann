@@ -1,49 +1,16 @@
-extern crate rand;
 
 use vector::*;
 use particle::Particle;
 use collision::Collision;
-use piston_window::*;
 
-// convert velocity to jet colour
-fn grey_to_jet(mut v: f64, min: f64, max: f64) -> (f32, f32, f32)
-{
-    let mut c_r = 1.0;
-    let mut c_g = 1.0;
-    let mut c_b = 1.0;
-
-    if v < min { v = min; }
-    if v > max { v = max; }
-    let dv = max - min;
-
-    if v < (min + 0.25 * dv) {
-      c_r = 0.0;
-      c_g = 4.0 * (v - min) / dv;
-    }
-    else if v < (min + 0.5 * dv) {
-      c_r = 0.0;
-      c_b = 1.0 + 4.0 * (min + 0.25 * dv - v) / dv;
-    }
-    else if v < (min + 0.75 * dv) {
-      c_r = 4.0 * (v - min - 0.5 * dv) / dv;
-      c_b = 0.0;
-    }
-    else {
-      c_g = 1.0 + 4.0 * (min + 0.75 * dv - v) / dv;
-      c_b = 0.0;
-    }
-
-    (c_r as f32, c_g as f32, c_b as f32)
-}
-
+use rand;
 
 pub struct Simulator {
-    particles: Vec<Particle>,
-    radius: f64,
-    gravity: f64,
-    width: u32,
-    height: u32,
-    window: PistonWindow
+    pub particles: Vec<Particle>,
+    pub radius: f64,
+    pub gravity: f64,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl Simulator {
@@ -68,8 +35,6 @@ impl Simulator {
             width: width,
             gravity: gravity,
             height: height,
-            window: WindowSettings::new("boltzmann", [width, height])
-            .exit_on_esc(true).build().unwrap()
         }
     }
 
@@ -171,32 +136,10 @@ impl Simulator {
         }
     }
 
-    fn draw(&mut self) {
-        let ps = self.particles.clone();
-        let r = self.radius;
-        let h = self.height as f64;
-
-        if let Some(e) = self.window.next() {
-            self.window.draw_2d(&e, |c, g| {
-                clear([0.1, 0.1, 0.1, 1.0], g);
-
-                for p in ps {
-                    let (red, green, blue) = grey_to_jet(p.get_velocity().magnitude(), 0.0, 100.0);
-                    ellipse([red, green, blue, 1.0],
-                            [p.get_position().x - r, h - p.get_position().y - r, 2.0*r, 2.0*r],
-                            c.transform, g);
-                }
-            });
-        }
-    }
-
     // call from main loop
     pub fn update(&mut self) {
-        self.draw();
-
         self.solve_collisions();
         self.boundary_check();
-
 
         // apply gravity
         for p in &mut self.particles {
