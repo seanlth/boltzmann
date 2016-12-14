@@ -2,34 +2,44 @@
 use vector::*;
 use particle::Particle;
 use collision::Collision;
+use quadtree::Quadtree;
 
 use rand;
 
 pub struct Simulator {
+    pub quadtree: Quadtree,
     pub particles: Vec<Particle>,
     pub radius: f64,
     pub gravity: f64,
-    pub width: u32,
-    pub height: u32,
+    pub width: f64,
+    pub height: f64,
 }
 
 impl Simulator {
 
-    pub fn new(number_of_particles: usize, radius: f64, gravity: f64, width: u32, height: u32, dt: f64) -> Simulator {
+    pub fn new(number_of_particles: usize, radius: f64, gravity: f64, width: f64, height: f64, dt: f64) -> Simulator {
         let mut particles = Vec::new();
+        let mut quadtree = Quadtree::new(0, radius, Vector::new(width/2.0, height/2.0), width, height);
 
-        for _ in 0..number_of_particles {
+        for i in 0..number_of_particles {
 
             // random positions and velocities
-            let p_x = (rand::random::<u32>() % width) as f64;
-            let p_y = (rand::random::<u32>() % height) as f64;
+            let p_x = (rand::random::<u32>() % width as u32) as f64;
+            let p_y = (rand::random::<u32>() % height as u32) as f64;
             let v_x = (rand::random::<u32>() % 50) as f64;
             let v_y = (rand::random::<u32>() % 50) as f64;
 
-            particles.push( Particle::new( Vector::new(p_x, height as f64 - p_y ), Vector::new(v_x, v_y), dt) )
+            let position = Vector::new( p_x, height as f64 - p_y );
+            let velocity = Vector::new( v_x, v_y );
+
+            particles.push( Particle::new(position, velocity, dt) );
+            quadtree.add_object(i, position);
         }
 
+        quadtree.print();
+
         Simulator {
+            quadtree: quadtree,
             particles: particles,
             radius: radius,
             width: width,
@@ -141,9 +151,12 @@ impl Simulator {
         self.solve_collisions();
         self.boundary_check();
 
+        self.quadtree.clear();
+
         // apply gravity
-        for p in &mut self.particles {
+        for (i, mut p) in &mut self.particles.iter_mut().enumerate() {
             p.verlet( Vector::new(0.0, self.gravity) );
+            self.quadtree.add_object(i, p.get_position())
         }
 
     }

@@ -1,12 +1,14 @@
+#[macro_use] extern crate conrod;
 extern crate boltzmann;
 extern crate graphics;
-#[macro_use] extern crate conrod;
 extern crate rand;
 
 use boltzmann::simulator::Simulator;
+use boltzmann::quadtree::Quadtree;
 
 use conrod::backend::piston::{self, Window, WindowEvents, OpenGL};
 use conrod::backend::piston::event::UpdateEvent;
+use graphics::*;
 
 widget_ids! {
     struct Ids { canvas, plot }
@@ -57,9 +59,33 @@ pub fn linear_interpolate(a: f64, b: f64, w: f64) -> f64 {
 	a * w + b * (1.0 - w)
 }
 
-fn main() {
-    let mut s = Simulator::new(40, 5.0, 0.0, 400, 200, 0.01);
+fn draw_quad_tree(quadtree: &Quadtree, c: &Context, g: &mut piston::gfx::G2d) {
+    let b = graphics::rectangle::Border { color: [1.0, 1.0, 1.0, 1.0], radius: 1.0 };
+    let mut rect = Rectangle::new([0.0, 0.0, 0.0, 0.0]);
+    rect.border = Some( b );
+    rect.draw([quadtree.position.x - quadtree.width/2.0, quadtree.position.y - quadtree.height/2.0, quadtree.width, quadtree.height], &c.draw_state, c.transform, g);
 
+    let colour: f32 = (rand::random::<u32>()) as f32 / std::u32::MAX as f32;
+
+    for &(_, p) in &quadtree.objects {
+        // let (red, green, blue) = grey_to_jet(p.get_velocity().magnitude(), 0.0, 100.0);
+           graphics::ellipse([colour, 1.0, colour, 1.0],
+                   [p.x - quadtree.radius, 200.0 - p.y - quadtree.radius, 2.0*quadtree.radius, 2.0*quadtree.radius],
+                   c.transform, g);
+    }
+
+    if let Some((ref c1, ref c2, ref c3, ref c4)) = quadtree.children {
+        draw_quad_tree(c1, c, g);
+        // draw_quad_tree(c2, c, g);
+        // draw_quad_tree(c3, c, g);
+        // draw_quad_tree(c4, c, g);
+    }
+}
+
+fn main() {
+    let mut s = Simulator::new(60, 5.0, 0.0, 400.0, 200.0, 0.01);
+
+    let mut t = 0;
 
     let mut window: Window =
        piston::window::WindowSettings::new("boltzmann", [400, 400])
@@ -134,10 +160,11 @@ fn main() {
                 .bottom_left_with_margins_on(ids.canvas, 0.0, 0.0)
                 .set(ids.plot, ui);
         });
-
+        if t == 0 {
         window.draw_2d(&event, |c, g| {
 
             let primitives = ui.draw();
+            //if let Some(primitives) = ui.draw_if_changed() {
             graphics::clear([0.1, 0.1, 0.1, 1.0], g);
 
             fn texture_from_image<T>(img: &T) -> &T { img };
@@ -146,14 +173,29 @@ fn main() {
                                  &image_map,
                                  texture_from_image);
 
-            for p in ps {
-                let (red, green, blue) = grey_to_jet(p.get_velocity().magnitude(), 0.0, 100.0);
-                graphics::ellipse([red, green, blue, 1.0],
-                        [p.get_position().x - r, h - p.get_position().y - s.radius, 2.0*r, 2.0*r],
-                        c.transform, g);
-            }
-        });
-        s.update();
-    }
+            draw_quad_tree(&s.quadtree, &c, g);
 
+            // for p in ps {
+            //     let (red, green, blue) = grey_to_jet(p.get_velocity().magnitude(), 0.0, 100.0);
+            //     graphics::ellipse([red, green, blue, 1.0],
+            //             [p.get_position().x - r, h - p.get_position().y - s.radius, 2.0*r, 2.0*r],
+            //             c.transform, g);
+            //
+            //
+            //
+            //     // let mut rect = graphics::Rectangle::new([0.0, 0.0, 0.0, 0.0]);
+            //     // rect.border = Some(b);
+            //     // rect.draw( [p.get_position().x - r, h - p.get_position().y - s.radius, 2.0*r, 2.0*r],  )
+            //     // let square = graphics::rectangle::Border::
+            //     // let red = [1.0, 0.0, 0.0, 1.0];
+            //     // rectangle(red, square, view.trans(self.x, self.y).trans(-50.0, -50.0), g);
+            // }
+        });
+        }
+        if t == 0 {
+            s.update();
+        }
+        t += 1;
+
+    }
 }
