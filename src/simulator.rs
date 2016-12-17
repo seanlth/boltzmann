@@ -11,13 +11,16 @@ pub struct Simulator {
     pub particles: Vec<Particle>,
     pub radius: f64,
     pub gravity: f64,
+    pub elasticity: f64,
     pub width: f64,
     pub height: f64,
+    pub dt: f64
 }
 
+#[allow(dead_code)]
 impl Simulator {
 
-    pub fn new(number_of_particles: usize, radius: f64, gravity: f64, width: f64, height: f64, dt: f64) -> Simulator {
+    pub fn new(number_of_particles: usize, radius: f64, gravity: f64, elasticity: f64, width: f64, height: f64, dt: f64) -> Simulator {
         let mut particles = Vec::new();
         let mut quadtree = Quadtree::new(0, radius, Vector::new(width/2.0, height/2.0), width, height);
 
@@ -36,18 +39,23 @@ impl Simulator {
             quadtree.add_object(i, position);
         }
 
-        quadtree.print();
+        // quadtree.print();
 
         Simulator {
             quadtree: quadtree,
             particles: particles,
             radius: radius,
-            width: width,
             gravity: gravity,
+            elasticity: elasticity,
+            width: width,
             height: height,
+            dt: dt
         }
     }
 
+    pub fn insert_particle(&mut self, p: Vector, v: Vector) {
+        self.particles.push( Particle::new(p, v, self.dt) );
+    }
 
     pub fn velociies(&self) -> Vec<f64> {
         let mut vs = Vec::new();
@@ -68,8 +76,7 @@ impl Simulator {
         energy
     }
 
-    // check for collisions (naive)
-    fn collision_check(&self) -> Vec<Collision> {
+    fn naive_collision_check(&self) -> Vec<Collision> {
         let mut collisions = Vec::new();
 
         for i in 0..self.particles.len() {
@@ -91,12 +98,49 @@ impl Simulator {
                 }
             }
         }
-        return collisions;
+
+        collisions
+    }
+
+    fn collision_check(&self, quadtree: &Quadtree, n: &mut usize) -> Vec<Collision> {
+        let mut collisions = Vec::new();
+
+        for i in 0..quadtree.objects.len() {
+            let (index1, _) = quadtree.objects[i];
+            let p_position = self.particles[index1].get_position();
+
+            for j in (i+1)..quadtree.objects.len() {
+                let (index2, _) =  quadtree.objects[j];
+                let q_position = self.particles[index2].get_position();
+
+                let normal = (q_position - p_position).normalise();
+                let penetration = 2.0*self.radius - p_position.distance( q_position );
+
+                // if circles are overlapping
+                if penetration > 0.0 {
+                    // add collision
+                    collisions.push( Collision::new(index1, index2, penetration, normal) );
+                }
+                *n += 1
+            }
+        }
+        if let Some((ref c1, ref c2, ref c3, ref c4)) = quadtree.children {
+            collisions.append( &mut self.collision_check(c1, n) );
+            collisions.append( &mut self.collision_check(c2, n) );
+            collisions.append( &mut self.collision_check(c3, n) );
+            collisions.append( &mut self.collision_check(c4, n) );
+        }
+
+        collisions
     }
 
     // solves collisions by applying impulse and adjusting particle locations
     fn solve_collisions(&mut self) {
-        let collisions = self.collision_check();
+        let mut n: usize = 0;
+        let collisions = self.collision_check(&self.quadtree, &mut n);
+        // let collisions = self.naive_collision_check();
+
+        // println!("{}", n);
 
         for c in collisions {
             let p = self.particles[c.p1];
@@ -129,19 +173,25 @@ impl Simulator {
             let velocity = p.get_velocity();
             if position.x - self.radius < 0.0 {
                 p.set_position( Vector::new( self.radius, position.y ) );
-                p.set_velocity( Vector::new( -velocity.x, velocity.y ) );
+                p.set_velocity( Vector::new( velocity.x.abs()*self.elasticity, velocity.y ) );
             }
+            let position = p.get_position();
+            let velocity = p.get_velocity();
             if position.x + self.radius > self.width as f64 {
                 p.set_position( Vector::new( self.width as f64 - self.radius, position.y ) );
-                p.set_velocity( Vector::new( -velocity.x, velocity.y ) );
+                p.set_velocity( Vector::new( - velocity.x.abs()*self.elasticity, velocity.y ) );
             }
+            let position = p.get_position();
+            let velocity = p.get_velocity();
             if position.y - self.radius < 0.0 {
                 p.set_position( Vector::new( position.x, self.radius ) );
-                p.set_velocity( Vector::new( velocity.x, -velocity.y ) );
+                p.set_velocity( Vector::new( velocity.x, velocity.y.abs()*self.elasticity ) );
             }
+            let position = p.get_position();
+            let velocity = p.get_velocity();
             if position.y + self.radius > self.height as f64 {
                 p.set_position( Vector::new( position.x, self.height as f64 - self.radius ) );
-                p.set_velocity( Vector::new( velocity.x, -velocity.y ) );
+                p.set_velocity( Vector::new( velocity.x, - velocity.y.abs()*self.elasticity ) );
             }
         }
     }

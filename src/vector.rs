@@ -47,6 +47,10 @@ impl Vector {
     }
 
     pub fn print(&self) {
+        print!("(x: {}, y: {})", self.x, self.y);
+    }
+
+    pub fn println(&self) {
         println!("(x: {}, y: {})", self.x, self.y);
     }
 }
