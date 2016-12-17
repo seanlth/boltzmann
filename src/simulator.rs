@@ -57,7 +57,7 @@ impl Simulator {
         self.particles.push( Particle::new(p, v, self.dt) );
     }
 
-    pub fn velociies(&self) -> Vec<f64> {
+    pub fn velocities(&self) -> Vec<f64> {
         let mut vs = Vec::new();
         for p in &self.particles {
             let v = p.get_velocity();

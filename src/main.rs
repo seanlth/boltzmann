@@ -81,72 +81,67 @@ fn draw_quad_tree(quadtree: &Quadtree, c: &Context, g: &mut piston::gfx::G2d) {
     rect.draw([quadtree.position.x - quadtree.width/2.0, 200.0 - quadtree.position.y - quadtree.height/2.0, quadtree.width, quadtree.height], &c.draw_state, c.transform, g);
 }
 
-fn main() {
-    let mut s = Simulator::new(0, 4.5, 0.0, 0.5, 400.0, 200.0, 0.01);
+fn velocity_density(velocities: Vec<f64>, bins: usize) -> Box<Fn(f64) -> f64> {
+    let mut density = vec![0.0; bins];
+    let mut max = 0.0;
 
-    let mut window: Window =
-       piston::window::WindowSettings::new("boltzmann", [400, 400])
-           .opengl(OpenGL::V3_2)
-           .samples(4)
-           .exit_on_esc(true)
-           .build()
-           .unwrap();
+    for v in velocities {
+        let i = v as usize / bins;
+        density[ std::cmp::min(i, bins-1) ] += 1.0;
+        if density[ std::cmp::min(i, bins-1) ] > max {
+            max = density[ std::cmp::min(i, bins-1) ];
+        }
+    }
 
-    let mut events = WindowEvents::new();
-    let mut ui = conrod::UiBuilder::new([400.0 as f64, 400.0 as f64]).build();
+    let f = move |x: f64| -> f64 {
+        let i = x as usize;
+        let j = i + 1;
+        let h = if i > 0 {i - 1} else { 0 };
+        let k = i + 2;
+        let a = density[ std::cmp::max(h, 0) ] as f64 / max;
+        let b = density[ std::cmp::min(i, bins-1) ] as f64 / max;
+        let c = density[ std::cmp::min(j, bins-1) ] as f64 / max;
+        let d = density[ std::cmp::min(k, bins-1) ] as f64 / max;
 
-    // A unique identifier for each widget.
+        let v = x - i as f64;
+
+        cubic_interpolate(a, b, c, d, v)
+    };
+
+    Box::new(f)
+}
+
+fn create_window(width: f64, height: f64) -> (Window, WindowEvents, conrod::Ui, Ids, piston::window::GlyphCache) {
+    let mut window: Window = piston::window::WindowSettings::new("boltzmann", [400, 400])
+                             .opengl(OpenGL::V3_2)
+                             .samples(4)
+                             .exit_on_esc(true)
+                             .build()
+                             .unwrap();
+
+    let events = WindowEvents::new();
+    let mut ui = conrod::UiBuilder::new([width as f64, 2.0*height as f64]).build();
     let ids = Ids::new(ui.widget_id_generator());
+    let text_texture_cache = piston::window::GlyphCache::new(&mut window, 0, 0);
 
-    // No text to draw, so we'll just create an empty text texture cache.
-    let mut text_texture_cache = piston::window::GlyphCache::new(&mut window, 0, 0);
+    (window, events, ui, ids, text_texture_cache)
+}
 
-    // The image map describing each of our widget->image mappings (in our case, none).
+fn main_loop(mut s: Simulator, width: f64, height: f64, window_info: (Window, WindowEvents, conrod::Ui, Ids, piston::window::GlyphCache), draw_tree: bool) {
+    let (mut window, mut events, mut ui, ids, mut text_texture_cache) = window_info;
     let image_map = conrod::image::Map::new();
 
     let mut mouse_position: (f64, f64) = (0.0, 0.0);
     let mut holding_f = false;
 
-
-    // Poll events from the window.
     while let Some(event) = window.next_event(&mut events) {
-        let vs: Vec<f64> = s.velociies();
-        let mut density = vec![0.0; 10];
 
-        let mut max = 0.0;
+        let f = velocity_density(s.velocities(), 10);
 
-        for v in vs {
-            let i = v as usize / 10;
-
-            density[ std::cmp::min(i, 9) ] += 1.0;
-            if density[ std::cmp::min(i, 9) ] > max {
-                max = density[ std::cmp::min(i, 9) ];
-            }
-        }
-
-        let r = s.radius;
-        let h = s.height as f64;
-
-        let f = |x: f64| -> f64 {
-            let i = x as usize;
-            let j = i + 1;
-            let h = if i > 0 {i - 1} else { 0 };
-            let k = i + 2;
-            let a = density[ std::cmp::max(h, 0) ] as f64 / max;
-            let b = density[ std::cmp::min(i, 9) ] as f64 / max;
-            let c = density[ std::cmp::min(j, 9) ] as f64 / max;
-            let d = density[ std::cmp::min(k, 9) ] as f64 / max;
-
-            let v = x - i as f64;
-
-            cubic_interpolate(a, b, c, d, v)
-        };
-
-        // Convert the piston event to a conrod event.
         if let Some(e) = piston::window::convert_event(event.clone(), &window) {
             if let conrod::event::Input::Move( m ) = e {
                 if let conrod::event::Motion::MouseCursor(x, y) = m {
-                    mouse_position = (x + 200.0, y);
+                    mouse_position = (x + height, y);
                 }
             }
 
@@ -189,12 +184,6 @@ fn main() {
             ui.handle_event(e);
         }
 
-
-        // if conrod::event::  = event {
-        //     blend = (blend + 1) % blends.len();
-        //     println!("Changed blending to {:?}", blend);
-        // }
-
         event.update(|_| {
             use conrod::{color, widget, Colorable, Positionable, Sizeable, Widget};
 
@@ -203,36 +192,32 @@ fn main() {
             widget::Canvas::new().color(color::DARK_CHARCOAL).set(ids.canvas, ui);
 
             let min_x = 0.0;
-            let max_x = density.len() as f64;
+            let max_x = 10.0;
             let min_y = 0.0;
             let max_y = 1.0;
-            widget::PlotPath::new(min_x, max_x, min_y, max_y, &f)
+            widget::PlotPath::new(min_x, max_x, min_y, max_y, &*f)
                 .color( color::Color::Rgba(0.44, 0.67, 0.89, 1.0) )
-                .w_h(400.0, 50.0)
+                .w_h(width, height / 2.0)
                 .bottom_left_with_margins_on(ids.canvas, 0.0, 0.0)
                 .set(ids.plot, ui);
         });
-        //if t == 0 {
         window.draw_2d(&event, |c, g| {
 
             let primitives = ui.draw();
-            //if let Some(primitives) = ui.draw_if_changed() {
             graphics::clear([0.1, 0.1, 0.1, 1.0], g);
 
-            fn texture_from_image<T>(img: &T) -> &T { img };
+            fn texture_from_image<U>(img: &U) -> &U { img };
             piston::window::draw(c, g, primitives,
                                  &mut text_texture_cache,
                                  &image_map,
                                  texture_from_image);
 
-            draw_quad_tree(&s.quadtree, &c, g);
-            // quadtree.print();
-
+            if draw_tree { draw_quad_tree(&s.quadtree, &c, g) };
 
             for p in &s.particles {
                 let (red, green, blue) = grey_to_jet(p.get_velocity().magnitude(), 0.0, 100.0);
                 graphics::ellipse([red, green, blue, 1.0],
-                        [p.get_position().x - r, h - p.get_position().y - s.radius, 2.0*r, 2.0*r],
+                        [p.get_position().x - s.radius, s.height - p.get_position().y - s.radius, 2.0*s.radius, 2.0*s.radius],
                         c.transform, g);
             }
 
@@ -240,4 +225,14 @@ fn main() {
 
         s.update();
     }
+}
+
+
+fn main() {
+    let width = 400.0;
+    let height = 200.0;
+
+    let s = Simulator::new(800, 2.5, 0.0, 1.0, width, height, 0.01);
+    let w = create_window(width, height);
+    main_loop(s, width, height, w, false);
 }
