@@ -5,7 +5,9 @@ extern crate rand;
 
 use boltzmann::simulator::Simulator;
 use boltzmann::quadtree::Quadtree;
+use boltzmann::spatial_hash::SpatialHash;
 use boltzmann::vector::Vector;
+use boltzmann::collision::SpatialPartition;
 
 use conrod::backend::piston::{self, Window, WindowEvents, OpenGL};
 use conrod::backend::piston::event::UpdateEvent;
@@ -127,7 +129,7 @@ fn create_window(width: f64, height: f64) -> (Window, WindowEvents, conrod::Ui, 
     (window, events, ui, ids, text_texture_cache)
 }
 
-fn main_loop(mut s: Simulator, width: f64, height: f64, window_info: (Window, WindowEvents, conrod::Ui, Ids, piston::window::GlyphCache), draw_tree: bool) {
+fn main_loop<T: SpatialPartition>(mut s: Simulator<T>, width: f64, height: f64, window_info: (Window, WindowEvents, conrod::Ui, Ids, piston::window::GlyphCache), draw_tree: bool) {
     let (mut window, mut events, mut ui, ids, mut text_texture_cache) = window_info;
     let image_map = conrod::image::Map::new();
 
@@ -136,7 +138,7 @@ fn main_loop(mut s: Simulator, width: f64, height: f64, window_info: (Window, Wi
 
     while let Some(event) = window.next_event(&mut events) {
 
-        let f = velocity_density(s.velocities(), 10);
+        let f = velocity_density(s.velocities(), 15);
 
         if let Some(e) = piston::window::convert_event(event.clone(), &window) {
             if let conrod::event::Input::Move( m ) = e {
@@ -212,7 +214,7 @@ fn main_loop(mut s: Simulator, width: f64, height: f64, window_info: (Window, Wi
                                  &image_map,
                                  texture_from_image);
 
-            if draw_tree { draw_quad_tree(&s.quadtree, &c, g) };
+            // if draw_tree { draw_quad_tree(&s.quadtree, &c, g) };
 
             for p in &s.particles {
                 let (red, green, blue) = grey_to_jet(p.get_velocity().magnitude(), 0.0, 100.0);
@@ -232,7 +234,10 @@ fn main() {
     let width = 400.0;
     let height = 200.0;
 
-    let s = Simulator::new(800, 2.5, 0.0, 1.0, width, height, 0.01);
+    // let quadtree = Quadtree::new(0, 2.5, Vector::new(width/2.0, height/2.0), width, height);
+    let spatial_hash = SpatialHash::new(width, height, 10, 10, 2.5);
+
+    let s = Simulator::new(spatial_hash, 800, 2.5, 0.0, 1.0, width, height, 0.001);
     let w = create_window(width, height);
     main_loop(s, width, height, w, false);
 }

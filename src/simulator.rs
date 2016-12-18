@@ -1,13 +1,13 @@
 
 use vector::*;
 use particle::Particle;
-use collision::Collision;
+use collision::*;
 use quadtree::Quadtree;
 
 use rand;
 
-pub struct Simulator {
-    pub quadtree: Quadtree,
+pub struct Simulator<T> {
+    pub spatial_partition: T,
     pub particles: Vec<Particle>,
     pub radius: f64,
     pub gravity: f64,
@@ -18,9 +18,42 @@ pub struct Simulator {
 }
 
 #[allow(dead_code)]
-impl Simulator {
+impl<T: SpatialPartition> Simulator<T> {
 
-    pub fn new(number_of_particles: usize, radius: f64, gravity: f64, elasticity: f64, width: f64, height: f64, dt: f64) -> Simulator {
+    pub fn new_with_quadtree(number_of_particles: usize, radius: f64, gravity: f64, elasticity: f64, width: f64, height: f64, dt: f64) -> Simulator<Quadtree> {
+        let mut particles = Vec::new();
+        let mut quadtree = Quadtree::new(0, radius, Vector::new(width/2.0, height/2.0), width, height);
+
+        for i in 0..number_of_particles {
+
+            // random positions and velocities
+            let p_x = (rand::random::<u32>() % width as u32) as f64;
+            let p_y = (rand::random::<u32>() % height as u32) as f64;
+            let v_x = (rand::random::<u32>() % 50) as f64 - 25.0;
+            let v_y = (rand::random::<u32>() % 50) as f64 - 25.0;
+
+            let position = Vector::new( p_x, height as f64 - p_y );
+            let velocity = Vector::new( v_x, v_y );
+
+            particles.push( Particle::new(position, velocity, dt) );
+            quadtree.add_object(i, position);
+        }
+
+        // quadtree.print();
+
+        Simulator {
+            spatial_partition: quadtree,
+            particles: particles,
+            radius: radius,
+            gravity: gravity,
+            elasticity: elasticity,
+            width: width,
+            height: height,
+            dt: dt
+        }
+    }
+
+    pub fn new(t: T, number_of_particles: usize, radius: f64, gravity: f64, elasticity: f64, width: f64, height: f64, dt: f64) -> Simulator<T> {
         let mut particles = Vec::new();
         let mut quadtree = Quadtree::new(0, radius, Vector::new(width/2.0, height/2.0), width, height);
 
@@ -42,7 +75,7 @@ impl Simulator {
         // quadtree.print();
 
         Simulator {
-            quadtree: quadtree,
+            spatial_partition: t,
             particles: particles,
             radius: radius,
             gravity: gravity,
@@ -102,42 +135,44 @@ impl Simulator {
         collisions
     }
 
-    fn collision_check(&self, quadtree: &Quadtree, n: &mut usize) -> Vec<Collision> {
-        let mut collisions = Vec::new();
-
-        for i in 0..quadtree.objects.len() {
-            let (index1, _) = quadtree.objects[i];
-            let p_position = self.particles[index1].get_position();
-
-            for j in (i+1)..quadtree.objects.len() {
-                let (index2, _) =  quadtree.objects[j];
-                let q_position = self.particles[index2].get_position();
-
-                let normal = (q_position - p_position).normalise();
-                let penetration = 2.0*self.radius - p_position.distance( q_position );
-
-                // if circles are overlapping
-                if penetration > 0.0 {
-                    // add collision
-                    collisions.push( Collision::new(index1, index2, penetration, normal) );
-                }
-                *n += 1
-            }
-        }
-        if let Some((ref c1, ref c2, ref c3, ref c4)) = quadtree.children {
-            collisions.append( &mut self.collision_check(c1, n) );
-            collisions.append( &mut self.collision_check(c2, n) );
-            collisions.append( &mut self.collision_check(c3, n) );
-            collisions.append( &mut self.collision_check(c4, n) );
-        }
-
-        collisions
-    }
+    // fn collision_check(&self, quadtree: &Quadtree, n: &mut usize) -> Vec<Collision> {
+    //     let mut collisions = Vec::new();
+    //
+    //     if let Some((ref c1, ref c2, ref c3, ref c4)) = quadtree.children {
+    //         collisions.append( &mut self.collision_check(c1, n) );
+    //         collisions.append( &mut self.collision_check(c2, n) );
+    //         collisions.append( &mut self.collision_check(c3, n) );
+    //         collisions.append( &mut self.collision_check(c4, n) );
+    //     }
+    //
+    //     for i in 0..quadtree.objects.len() {
+    //         let (index1, _) = quadtree.objects[i];
+    //         let p_position = self.particles[index1].get_position();
+    //
+    //         for j in (i+1)..quadtree.objects.len() {
+    //             let (index2, _) =  quadtree.objects[j];
+    //             let q_position = self.particles[index2].get_position();
+    //
+    //             let normal = (q_position - p_position).normalise();
+    //             let penetration = 2.0*self.radius - p_position.distance( q_position );
+    //
+    //             // if circles are overlapping
+    //             if penetration > 0.0 {
+    //                 // add collision
+    //                 collisions.push( Collision::new(index1, index2, penetration, normal) );
+    //             }
+    //             *n += 1
+    //         }
+    //     }
+    //
+    //
+    //     collisions
+    // }
 
     // solves collisions by applying impulse and adjusting particle locations
     fn solve_collisions(&mut self) {
         let mut n: usize = 0;
-        let collisions = self.collision_check(&self.quadtree, &mut n);
+        let collisions = self.spatial_partition.collision_check(&self.particles);
         // let collisions = self.naive_collision_check();
 
         // println!("{}", n);
@@ -201,12 +236,12 @@ impl Simulator {
         self.solve_collisions();
         self.boundary_check();
 
-        self.quadtree.clear();
+        self.spatial_partition.clear();
 
         // apply gravity
         for (i, mut p) in &mut self.particles.iter_mut().enumerate() {
             p.verlet( Vector::new(0.0, self.gravity) );
-            self.quadtree.add_object(i, p.get_position())
+            self.spatial_partition.insert(i, p.get_position())
         }
 
     }

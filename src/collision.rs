@@ -1,5 +1,5 @@
-
 use vector::Vector;
+use particle::Particle;
 
 pub struct Collision {
     pub p1: usize,
@@ -17,4 +17,10 @@ impl Collision {
             normal: normal
         }
     }
+}
+
+pub trait SpatialPartition {
+    fn insert(&mut self, index: usize, position: Vector);
+    fn clear(&mut self);
+    fn collision_check(&self, particles: &Vec<Particle>) -> Vec<Collision>;
 }
