@@ -2,11 +2,12 @@
 use vector::*;
 use particle::Particle;
 use collision::*;
+use spatial_hash::SpatialHash;
 use quadtree::Quadtree;
 
 use rand;
 
-pub struct Simulator<T> {
+pub struct Simulator<T: SpatialPartition> {
     pub spatial_partition: T,
     pub particles: Vec<Particle>,
     pub radius: f64,
@@ -17,72 +18,63 @@ pub struct Simulator<T> {
     pub dt: f64
 }
 
+
+impl Simulator<Quadtree> {
+    pub fn new(number_of_particles: usize, radius: f64, gravity: f64, elasticity: f64, width: f64, height: f64, dt: f64) -> Simulator<Quadtree> {
+        
+        let mut s = Simulator {
+            spatial_partition: Quadtree::new(0, radius, Vector::new(width/2.0, height/2.0), width, height),
+            particles: vec![],
+            radius: radius,
+            gravity: gravity,
+            elasticity: elasticity,
+            width: width,
+            height: height,
+            dt: dt
+        };
+        s.setup_particles(number_of_particles, width, height, dt);
+        s
+    }
+}
+
+impl Simulator<SpatialHash> {
+    pub fn new(number_of_particles: usize, radius: f64, gravity: f64, elasticity: f64, width: f64, height: f64, dt: f64) -> Simulator<SpatialHash> {
+
+        let mut s = Simulator {
+            spatial_partition: SpatialHash::new(width, height, 10, 10, radius),
+            particles: vec![],
+            radius: radius,
+            gravity: gravity,
+            elasticity: elasticity,
+            width: width,
+            height: height,
+            dt: dt
+        };
+        s.setup_particles(number_of_particles, width, height, dt);
+        s
+    }
+}
+
+
 #[allow(dead_code)]
 impl<T: SpatialPartition> Simulator<T> {
 
-    pub fn new_with_quadtree(number_of_particles: usize, radius: f64, gravity: f64, elasticity: f64, width: f64, height: f64, dt: f64) -> Simulator<Quadtree> {
-        let mut particles = Vec::new();
-        let mut quadtree = Quadtree::new(0, radius, Vector::new(width/2.0, height/2.0), width, height);
+    fn setup_particles(&mut self, number_of_particles: usize, width: f64, height: f64, dt: f64) {
 
         for i in 0..number_of_particles {
 
             // random positions and velocities
             let p_x = (rand::random::<u32>() % width as u32) as f64;
             let p_y = (rand::random::<u32>() % height as u32) as f64;
-            let v_x = (rand::random::<u32>() % 50) as f64 - 25.0;
-            let v_y = (rand::random::<u32>() % 50) as f64 - 25.0;
+            let v_x = (rand::random::<u32>() % 500) as f64 - 250.0;
+            let v_y = (rand::random::<u32>() % 500) as f64 - 250.0;
 
             let position = Vector::new( p_x, height as f64 - p_y );
             let velocity = Vector::new( v_x, v_y );
 
-            particles.push( Particle::new(position, velocity, dt) );
-            quadtree.add_object(i, position);
-        }
+            self.particles.push( Particle::new(position, velocity, dt) );
 
-        // quadtree.print();
-
-        Simulator {
-            spatial_partition: quadtree,
-            particles: particles,
-            radius: radius,
-            gravity: gravity,
-            elasticity: elasticity,
-            width: width,
-            height: height,
-            dt: dt
-        }
-    }
-
-    pub fn new(t: T, number_of_particles: usize, radius: f64, gravity: f64, elasticity: f64, width: f64, height: f64, dt: f64) -> Simulator<T> {
-        let mut particles = Vec::new();
-        let mut quadtree = Quadtree::new(0, radius, Vector::new(width/2.0, height/2.0), width, height);
-
-        for i in 0..number_of_particles {
-
-            // random positions and velocities
-            let p_x = (rand::random::<u32>() % width as u32) as f64;
-            let p_y = (rand::random::<u32>() % height as u32) as f64;
-            let v_x = (rand::random::<u32>() % 50) as f64;
-            let v_y = (rand::random::<u32>() % 50) as f64;
-
-            let position = Vector::new( p_x, height as f64 - p_y );
-            let velocity = Vector::new( v_x, v_y );
-
-            particles.push( Particle::new(position, velocity, dt) );
-            quadtree.add_object(i, position);
-        }
-
-        // quadtree.print();
-
-        Simulator {
-            spatial_partition: t,
-            particles: particles,
-            radius: radius,
-            gravity: gravity,
-            elasticity: elasticity,
-            width: width,
-            height: height,
-            dt: dt
+            self.spatial_partition.insert(i, position);
         }
     }
 

@@ -36,19 +36,6 @@ impl Quadtree {
         self.empty == true;
     }
 
-    // delete objects from the tree leaves non empty children alive
-    pub fn clear(&mut self) {
-        if self.empty == true { self.children = None; }
-        if let Some((ref mut c1, ref mut c2, ref mut c3, ref mut c4)) = self.children {
-            c1.clear();
-            c2.clear();
-            c3.clear();
-            c4.clear();
-        }
-
-        self.objects.clear();
-        self.empty = true;
-    }
 
     fn within(&self, p: Vector) -> bool {
         let b1 = p.x+self.radius >= self.position.x - self.width/2.0;
@@ -57,35 +44,6 @@ impl Quadtree {
         let b4 = p.y-self.radius <= self.position.y + self.height/2.0;
 
         b1 && b2 && b3 && b4
-    }
-
-    // add object to quadtee at current level
-    // will get added to children if valid
-    pub fn add_object(&mut self, index: usize, p: Vector) {
-        self.empty = false;
-        if let Some((ref mut c1, ref mut c2, ref mut c3, ref mut c4)) = self.children {
-            if c1.within(p) { c1.add_object(index, p); }
-            if c2.within(p) { c2.add_object(index, p); }
-            if c3.within(p) { c3.add_object(index, p); }
-            if c4.within(p) { c4.add_object(index, p); }
-        }
-        else {
-            self.objects.push((index, p));
-
-            // number of circles that can possibly fit within with volume
-            let objects_per_volume = ( self.width*self.height ) / (4.0*self.radius*self.radius );
-
-            // the volume must be able to contain more than 16
-            let maximum_objects_per_volume = 16.0;
-
-            // number of objects within the node
-            let object_limit = 16;
-
-            if self.objects.len() > object_limit && objects_per_volume > maximum_objects_per_volume {
-                // println!("divide");
-                self.divide();
-            }
-        }
     }
 
     // creates children nodes and inserts objects from this node to children
@@ -106,7 +64,7 @@ impl Quadtree {
 
         let temp = self.objects.clone();
         self.objects.clear();
-        for (i, p) in temp { self.add_object(i, p); }
+        for (i, p) in temp { self.insert(i, p); }
     }
 
     pub fn print(&self) {
@@ -124,12 +82,48 @@ impl Quadtree {
 }
 
 impl SpatialPartition for Quadtree {
+
+    // add object to quadtee at current level
+    // will get added to children if valid
     fn insert(&mut self, index: usize, p: Vector) {
-        self.add_object(index, p);
+        self.empty = false;
+        if let Some((ref mut c1, ref mut c2, ref mut c3, ref mut c4)) = self.children {
+            if c1.within(p) { c1.insert(index, p); }
+            if c2.within(p) { c2.insert(index, p); }
+            if c3.within(p) { c3.insert(index, p); }
+            if c4.within(p) { c4.insert(index, p); }
+        }
+        else {
+            self.objects.push((index, p));
+
+            // number of circles that can possibly fit within with volume
+            let objects_per_volume = ( self.width*self.height ) / (4.0*self.radius*self.radius );
+
+            // the volume must be able to contain more than 16
+            let maximum_objects_per_volume = 16.0;
+
+            // number of objects within the node
+            let object_limit = 16;
+
+            if self.objects.len() > object_limit && objects_per_volume > maximum_objects_per_volume {
+                // println!("divide");
+                self.divide();
+            }
+        }
     }
 
+    // delete objects from the tree leaves non empty children alive
     fn clear(&mut self) {
-        self.clear();
+        if self.empty == true { self.children = None; }
+        if let Some((ref mut c1, ref mut c2, ref mut c3, ref mut c4)) = self.children {
+            c1.clear();
+            c2.clear();
+            c3.clear();
+            c4.clear();
+        }
+
+        self.objects.clear();
+        self.empty = true;
     }
 
     fn collision_check(&self, particles: &Vec<Particle>) -> Vec<Collision> {
