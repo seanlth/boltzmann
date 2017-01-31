@@ -164,7 +164,7 @@ impl<T: SpatialPartition> Simulator<T> {
     // solves collisions by applying impulse and adjusting particle locations
     fn solve_collisions(&mut self) {
         let mut n: usize = 0;
-        let collisions = self.spatial_partition.collision_check(&self.particles);
+        let collisions = self.spatial_partition.collision_check();
         // let collisions = self.naive_collision_check();
 
         // println!("{}", n);

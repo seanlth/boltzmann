@@ -126,35 +126,35 @@ impl SpatialPartition for Quadtree {
         self.empty = true;
     }
 
-    fn collision_check(&self, particles: &Vec<Particle>) -> Vec<Collision> {
+    fn collision_check(&self) -> Vec<Collision> {
         let mut collisions = Vec::new();
-
-        if let Some((ref c1, ref c2, ref c3, ref c4)) = self.children {
-            collisions.append( &mut c1.collision_check(particles) );
-            collisions.append( &mut c2.collision_check(particles) );
-            collisions.append( &mut c3.collision_check(particles) );
-            collisions.append( &mut c4.collision_check(particles) );
-        }
-
-        for i in 0..self.objects.len() {
-            let (index1, _) = self.objects[i];
-            let p_position = particles[index1].get_position();
-
-            for j in (i+1)..self.objects.len() {
-                let (index2, _) =  self.objects[j];
-                let q_position = particles[index2].get_position();
-
-                let normal = (q_position - p_position).normalise();
-                let penetration = 2.0*self.radius - p_position.distance( q_position );
-
-                // if circles are overlapping
-                if penetration > 0.0 {
-                    // add collision
-                    collisions.push( Collision::new(index1, index2, penetration, normal) );
-                }
-            }
-        }
-
+    
+        // if let Some((ref c1, ref c2, ref c3, ref c4)) = self.children {
+        //     collisions.append( &mut c1.collision_check(particles) );
+        //     collisions.append( &mut c2.collision_check(particles) );
+        //     collisions.append( &mut c3.collision_check(particles) );
+        //     collisions.append( &mut c4.collision_check(particles) );
+        // }
+        // 
+        // for i in 0..self.objects.len() {
+        //     let (index1, _) = self.objects[i];
+        //     let p_position = particles[index1].get_position();
+        // 
+        //     for j in (i+1)..self.objects.len() {
+        //         let (index2, _) =  self.objects[j];
+        //         let q_position = particles[index2].get_position();
+        // 
+        //         let normal = (q_position - p_position).normalise();
+        //         let penetration = 2.0*self.radius - p_position.distance( q_position );
+        // 
+        //         // if circles are overlapping
+        //         if penetration > 0.0 {
+        //             // add collision
+        //             collisions.push( Collision::new(index1, index2, penetration, normal) );
+        //         }
+        //     }
+        // }
+    
         collisions
     }
 }

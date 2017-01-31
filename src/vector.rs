@@ -20,6 +20,20 @@ impl Vector {
             y: y
         }
     }
+    
+    pub fn zero() -> Vector {
+        Vector {
+            x: 0.0,
+            y: 0.0
+        }
+    }
+    
+    pub fn max() -> Vector {
+        Vector {
+            x: f64::MAX,
+            y: f64::MAX
+        }
+    }
 
     pub fn normalise(&self) -> Vector {
         let d = ( (self.x * self.x) + (self.y * self.y) ).sqrt();
