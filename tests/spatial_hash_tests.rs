@@ -125,54 +125,68 @@ fn test_collisions_2x2_non_random() {
     
     let mut particles = Vec::new();
     
+    
+    // 0
     let p = Vector::new(2.5, 2.5);
     particles.push( p );
     spatial_hash.insert( 0, p );
     
+    // 1
     let p = Vector::new(7.5, 2.5);
     particles.push( p );
     spatial_hash.insert( 1, p );
     
+    // 2
     let p = Vector::new(2.5, 7.5);
     particles.push( p );
     spatial_hash.insert( 2, p );
     
+    // 3
     let p = Vector::new(7.5, 7.5);
     particles.push( p );
     spatial_hash.insert( 3, p );
     
+    // 0
     let p = Vector::new(2.5, 5.0);
     particles.push( p );
     spatial_hash.insert( 4, p );
     
+    // 0
     let p = Vector::new(5.0, 2.5);
     particles.push( p );
     spatial_hash.insert( 5, p );
     
+    // 0
     let p = Vector::new(5.0, 5.0);
     particles.push( p );
     spatial_hash.insert( 6, p );
     
+    // 0
     let p = Vector::new(5.0, 5.0);
     particles.push( p );
     spatial_hash.insert( 7, p );
     
+    // 0
     let p = Vector::new(0.0, 0.0);
     particles.push( p );
     spatial_hash.insert( 8, p );
     
+    // 3
     let p = Vector::new(10.0, 10.0);
     particles.push( p );
     spatial_hash.insert( 9, p );
     
+    // 3
     let p = Vector::new(10.0, 10.0);
     particles.push( p );
     spatial_hash.insert( 10, p );
     
+    // 0
     let p = Vector::new(4.8, 5.2);
     particles.push( p );
     spatial_hash.insert( 11, p );
     
+    // 0
     let p = Vector::new(5.2, 4.8);
     particles.push( p );
     spatial_hash.insert( 12, p );
@@ -183,12 +197,12 @@ fn test_collisions_2x2_non_random() {
     
     let mut v1 = collision_pairs(c_o);
     let mut v2 = collision_pairs(c_n_o);
+    
+    let mut v3 = collision_pairs2(c_m);
+    let mut v4 = collision_pairs2(c_n_m);
+    
     v1.sort();
     v2.sort();
-    
-    print(&v1);
-    println!("");
-    print(&v2);
     
     let e = equal_sets(v1, v2);
     
@@ -217,20 +231,10 @@ fn test_collisions_2x2() {
     let mut v2 = collision_pairs(c_n_o);
     
     let mut v3 = collision_pairs2(c_m);
-    // let mut v4 = collision_pairs(c_n_o);
     v1.sort();
     v2.sort();
     v3.sort();
-    
-    spatial_hash.print();
-    let asd= spatial_hash.cells[0].len() + spatial_hash.cells[1].len() + spatial_hash.cells[2].len() + spatial_hash.cells[3].len();
-    // println!("{}", asd);
-    // print(&v1);
-    // println!("");
-    // print(&v2);
-    // println!("");
-    print(&v3);
-    
+        
     let e = equal_sets(v1, v2);
     
     assert_eq!(e, true)

@@ -611,12 +611,11 @@ fn draw<T: SpatialPartition>(display: GlutinFacade, program: Program, mut simula
 }
 
 fn main() {
-    let number_of_particles = 1000;
+    let number_of_particles = 2000;
     
     if let Some( (display, program) ) = setup_glium() {
         let (width, height): (u32, u32) = display.get_window().unwrap().get_inner_size_pixels().unwrap();
-        println!("{}, {}", width, height);
-        let simulator = Simulator::<SpatialHash>::new(number_of_particles, 20.0, -9.8, 0.4, width as f64, height as f64, 0.01);
+        let simulator = Simulator::<SpatialHash>::new(number_of_particles, 10.0, -9.8, 0.4, width as f64, height as f64, 0.01);
         let (vertex_buffer, index_buffer) = create_buffer(&display, number_of_particles);
         draw(display, program, simulator, vertex_buffer, index_buffer);
     }

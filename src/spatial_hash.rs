@@ -1,6 +1,20 @@
 use collision::*;
 use vector::Vector;
-use particle::Particle;
+use std::cmp;
+
+// -------------------------
+// |x |x |x |x \x |x |x |x |
+// |--|--|--|--|--|--|--|--|
+// |x |00|  |  |  |  |  |x |
+// |--|--|--|--|--|--|--|--|
+// |x |  |  |  |  |  |  |x |
+// |--|--|--|--|--|--|--|--|
+// |x |  |  |  |  |  |nn|x |
+// |--|--|--|--|--|--|--|--|
+// |x |x |x |x |x |x |x |x |
+// -------------------------
+
+
 
 pub struct SpatialHash {
     pub cells: Vec<Vec<(usize, Vector)>>,
@@ -14,11 +28,11 @@ pub struct SpatialHash {
 impl SpatialHash {
     pub fn new(width: f64, height: f64, number_of_columns: usize, number_of_rows: usize, radius: f64) -> SpatialHash {
         SpatialHash {
-            cells: vec![vec![]; number_of_columns*number_of_rows],
+            cells: vec![vec![]; (number_of_columns+2)*(number_of_rows+2)],
             number_of_columns: number_of_columns,
             number_of_rows: number_of_rows,
-            cell_width: width / number_of_columns as f64,
-            cell_height: height / number_of_rows as f64,
+            cell_width: width / (number_of_columns as f64),
+            cell_height: height / (number_of_rows as f64),
             radius: radius
         }
     }
@@ -29,8 +43,26 @@ impl SpatialHash {
         }
     }
     
-    fn index(&self, r: usize, c: usize) -> usize {
-        r*self.number_of_columns + c
+    fn in_cell(&self, v: Vector) -> (i32, i32) {
+        let c = (v.x / self.cell_width) as i32;
+        let r = (v.y / self.cell_height) as i32;
+        
+        (r, c)
+    }
+    
+    fn get_cell_index(&self, r: i32, c: i32) -> usize {
+        // println!("{}, {}", r, c);
+        (r+1) as usize * (self.number_of_columns+2) + (c+1) as usize
+    }
+    
+    fn in_left_set(&self, c: i32, v: Vector) -> bool {
+        let left = c as f64 * self.cell_width;
+        f64::abs( left - v.x ) < self.radius && c > 0
+    }
+    
+    fn in_top_set(&self, r: i32, v: Vector) -> bool {        
+        let up = r as f64 * self.cell_height;        
+        f64::abs( up - v.y ) < self.radius && r > 0
     }
     
     //  | r |
@@ -44,30 +76,56 @@ impl SpatialHash {
     //  | t |             |
     //  ------------------|
 
-    pub fn add_object(&mut self, index: usize, p: Vector) {
-        let i = (p.x / self.cell_width) as usize;
-        let j = (p.y / self.cell_height) as usize;
-
+    pub fn add_object(&mut self, index: usize, v: Vector) {
         
-        let left = i as f64 * self.cell_width;
-        let up = j as f64 * self.cell_height;
-
-        let in_left_set = f64::abs( left - p.x ) < self.radius;
-        let in_top_set = f64::abs( up - p.y ) < self.radius;
+        let (r, c) = self.in_cell(v);
         
-        let cell_index = if i > 0 && j > 0 && in_left_set && in_top_set {
-            self.index(j-1, i-1)
+        let (r, c) = (cmp::min(r, self.number_of_rows as i32-1), cmp::min(c, self.number_of_columns as i32-1));
+        
+        let cell_index = if self.in_left_set(c, v) && self.in_top_set(r, v) {
+            self.get_cell_index(r-1, c-1)
         }
-        else if i > 0 && in_left_set {
-            self.index(j, i-1)
+        else if self.in_left_set(c, v) {
+            self.get_cell_index(r, c-1)
         }
-        else if j > 0 && in_top_set {
-            self.index(j-1, i)
+        else if self.in_top_set(r, v) {
+            self.get_cell_index(r-1, c)
         }
         else {
-            self.index(j, i)
+            self.get_cell_index(r, c)
         };
-        self.cells[cell_index].push((index, p));
+        // println!("{}, {}", r, c );
+
+        self.cells[cell_index].push((index, v))
+        
+        
+        // let mut i = (p.x / self.cell_width) as usize;
+        // let mut j = (p.y / self.cell_height) as usize;
+        // 
+        // 
+        // 
+        // // i = usize::min(self.number_of_columns-2, usize::max(1, i);
+        // // j = usize::min(self.number_of_rows-2, usize::max(1, j);
+        // 
+        // let left = i as f64 * self.cell_width;
+        // let up = j as f64 * self.cell_height;
+        // 
+        // let in_left_set = f64::abs( left - p.x ) < self.radius;
+        // let in_top_set = f64::abs( up - p.y ) < self.radius;
+        // 
+        // let cell_index = if i > 0 && j > 0 && in_left_set && in_top_set {
+        //     self.index(j-1, i-1)
+        // }
+        // else if i > 0 && in_left_set {
+        //     self.index(j, i-1)
+        // }
+        // else if j > 0 && in_top_set {
+        //     self.index(j-1, i)
+        // }
+        // else {
+        //     self.index(j, i)
+        // };
+        // self.cells[cell_index].push((index, p));
     }
     
     fn check_particle_against_cell(&self, collisions: &mut Vec<Collision>, index: usize, position: Vector, cell: usize, start: usize ) -> Vec<(usize, usize)> {
@@ -103,10 +161,40 @@ impl SpatialHash {
         }
     }
     
+    pub fn collision_check2(&self) -> (Vec<Collision>, Vec<(usize, usize)>) {
+        let mut collisions = Vec::new();
+        let mut comparisons = Vec::new();
+
+        for r in 0..self.number_of_rows {
+            for c in 0..self.number_of_columns {
+                let r = r as i32;
+                let c = c as i32;
+
+                let cell_index = self.get_cell_index(r, c);
+                let cell = &self.cells[cell_index];
+            
+                let right_index = self.get_cell_index(r, c+1);
+                let bottom_left_index = self.get_cell_index(r+1, c-1);
+                let bottom_index = self.get_cell_index(r+1, c);
+                let bottom_right_index = self.get_cell_index(r+1, c+1);
+
+                for i in 0..cell.len() {
+                    let (index, position) = cell[i];
+                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, cell_index, i+1 ) );
+                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, right_index, 0 ) );
+                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, bottom_left_index, 0 ) );
+                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, bottom_index, 0 ) );
+                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, bottom_right_index, 0 ) );
+                }
+                
+                
+            }
+        }
+        
+        (collisions, comparisons)
+    }
     
-    
-    
-    
+    /*
     pub fn collision_check2(&self) -> (Vec<Collision>, Vec<(usize, usize)>) {
         let mut collisions = Vec::new();
         let mut comparisons = Vec::new();
@@ -174,6 +262,7 @@ impl SpatialHash {
 
         (collisions, comparisons)
     }
+    */
 }
 
 impl SpatialPartition for SpatialHash {
@@ -190,65 +279,87 @@ impl SpatialPartition for SpatialHash {
         let mut comparisons = Vec::new();
 
         // for c in &self.cells {
-        for k in 0..self.cells.len() {
-            let cell = &self.cells[k];
-            
-            let c = k % self.number_of_columns;
-            let r = k / self.number_of_columns; 
-            
-            let index1 = r * self.number_of_columns + c+1;
-            let index2 = (r+1) * self.number_of_columns + c;
-            let index3 = (r+1) * self.number_of_columns + c+1;
-            let index4 = ((r+1) * self.number_of_columns) as i32 + (c as i32 - 1);
-            
-            if c as i32 - 1 >= 0 && c + 1 < self.number_of_columns && r + 1 < self.number_of_rows {
+        // for k in 0..self.cells.len() {
+        for r in 0..self.number_of_rows {
+            for c in 0..self.number_of_columns {
+                let r = r as i32;
+                let c = c as i32;
+                let cell_index = self.get_cell_index(r, c);
+                let cell = &self.cells[cell_index];
+                
+                // let c = k % self.number_of_columns;
+                // let r = k / self.number_of_columns; 
+                
+                // let index1 = r * self.number_of_columns + c+1;
+                // let index2 = (r+1) * self.number_of_columns + c;
+                // let index3 = (r+1) * self.number_of_columns + c+1;
+                // let index4 = ((r+1) * self.number_of_columns) as i32 + (c as i32 - 1);
+                
+                let right_index = self.get_cell_index(r, c+1);
+                let bottom_left_index = self.get_cell_index(r+1, c-1);
+                let bottom_index = self.get_cell_index(r+1, c);
+                let bottom_right_index = self.get_cell_index(r+1, c+1);
+
                 for i in 0..cell.len() {
                     let (index, position) = cell[i];
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index1, 0 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index2, 0 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index3, 0 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index4 as usize, 0 ) );
+                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, cell_index, i+1 ) );
+                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, right_index, 0 ) );
+                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, bottom_left_index, 0 ) );
+                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, bottom_index, 0 ) );
+                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, bottom_right_index, 0 ) );
                 }
-            }
-            else if c as i32 - 1 >= 0 && r + 1 < self.number_of_rows {
-                for i in 0..cell.len() {
-                    let (index, position) = cell[i];
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index2, 0 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index4 as usize, 0 ) );
-                }
-            }
-            else if c + 1 < self.number_of_columns && r + 1 < self.number_of_rows {
-                for i in 0..cell.len() {
-                    let (index, position) = cell[i];
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index1, 0 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index2, 0 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index3, 0 ) );
-                }
-            }
-            else if c + 1 < self.number_of_columns {
-                for i in 0..cell.len() {
-                    let (index, position) = cell[i];
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index1, 0 ) );
-                }
-            }
-            else if r + 1 < self.number_of_rows {
-                for i in 0..cell.len() {
-                    let (index, position) = cell[i];
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index2, 0 ) );
-                }
-            }
-            else {
-                for i in 0..cell.len() {
-                    let (index, position) = cell[i];
-                    comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
-                }
+                
+                // if c >= 1 && c + 1 < self.number_of_columns && r + 1 < self.number_of_rows {
+                //     for i in 0..cell.len() {
+                //         let (index, position) = cell[i];
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index1, 0 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index2, 0 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index3, 0 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index4 as usize, 0 ) );
+                //     }
+                // }
+                // else if c >= 1 && r + 1 < self.number_of_rows {
+                //     for i in 0..cell.len() {
+                //         let (index, position) = cell[i];
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index2, 0 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index4 as usize, 0 ) );
+                //     }
+                // }
+                // else if c + 1 < self.number_of_columns && r + 1 < self.number_of_rows {
+                //     for i in 0..cell.len() {
+                //         let (index, position) = cell[i];
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index1, 0 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index2, 0 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index3, 0 ) );
+                //     }
+                // }
+                // else if c + 1 < self.number_of_columns {
+                //     for i in 0..cell.len() {
+                //         let (index, position) = cell[i];
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index1, 0 ) );
+                //     }
+                // }
+                // else if r + 1 < self.number_of_rows {
+                //     for i in 0..cell.len() {
+                //         let (index, position) = cell[i];
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, index2, 0 ) );
+                //     }
+                // }
+                // else {
+                //     for i in 0..cell.len() {
+                //         let (index, position) = cell[i];
+                //         comparisons.append( &mut self.check_particle_against_cell(&mut collisions, index, position, k, i+1 ) );
+                //     }
+                // }
             }
         }
+        
+        
 
         collisions
     }

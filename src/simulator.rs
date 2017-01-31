@@ -64,10 +64,10 @@ impl<T: SpatialPartition> Simulator<T> {
         for i in 0..number_of_particles {
 
             // random positions and velocities
-            let p_x = (rand::random::<u32>() % width as u32) as f64;
-            let p_y = (rand::random::<u32>() % height as u32) as f64;
-            let v_x = (rand::random::<u32>() % 500) as f64 - 250.0;
-            let v_y = (rand::random::<u32>() % 500) as f64 - 250.0;
+            let p_x = (rand::random::<f64>() * (width - 2.0*self.radius ) ) - self.radius;
+            let p_y = (rand::random::<f64>() * (height - 2.0*self.radius ) ) - self.radius;
+            let v_x = (rand::random::<f64>() * 500.0) - 250.0;
+            let v_y = (rand::random::<f64>() * 500.0) - 250.0;
 
             let position = Vector::new( p_x, height as f64 - p_y );
             let velocity = Vector::new( v_x, v_y );
