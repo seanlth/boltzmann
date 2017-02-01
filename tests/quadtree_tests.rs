@@ -1,8 +1,9 @@
 
+
 extern crate boltzmann;
 extern crate rand;
 
-use boltzmann::spatial_hash::SpatialHash;
+use boltzmann::quadtree::Quadtree;
 use boltzmann::collision::*;
 use boltzmann::vector::Vector;
 
@@ -111,8 +112,8 @@ fn collision_pairs2(comparisons: Vec<(usize, usize)>) -> Vec<P> {
 }
 
 #[test]
-fn test_collisions_2x2_non_random() {
-    let mut spatial_hash = SpatialHash::new(10.0, 10.0, 2, 2, 2.0);
+fn quadtree_test_collisions_2x2_non_random() {
+    let mut quadtree = Quadtree::new(0, 2.0, Vector::new(5.0, 5.0), 10.0, 10.0);
     
     let mut particles = Vec::new();
     
@@ -120,77 +121,77 @@ fn test_collisions_2x2_non_random() {
     // 0
     let p = Vector::new(2.5, 2.5);
     particles.push( p );
-    spatial_hash.insert( 0, p );
+    quadtree.insert( 0, p );
     
     // 1
     let p = Vector::new(7.5, 2.5);
     particles.push( p );
-    spatial_hash.insert( 1, p );
+    quadtree.insert( 1, p );
     
     // 2
     let p = Vector::new(2.5, 7.5);
     particles.push( p );
-    spatial_hash.insert( 2, p );
+    quadtree.insert( 2, p );
     
     // 3
     let p = Vector::new(7.5, 7.5);
     particles.push( p );
-    spatial_hash.insert( 3, p );
+    quadtree.insert( 3, p );
     
     // 0
     let p = Vector::new(2.5, 5.0);
     particles.push( p );
-    spatial_hash.insert( 4, p );
+    quadtree.insert( 4, p );
     
     // 0
     let p = Vector::new(5.0, 2.5);
     particles.push( p );
-    spatial_hash.insert( 5, p );
+    quadtree.insert( 5, p );
     
     // 0
     let p = Vector::new(5.0, 5.0);
     particles.push( p );
-    spatial_hash.insert( 6, p );
+    quadtree.insert( 6, p );
     
     // 0
     let p = Vector::new(5.0, 5.0);
     particles.push( p );
-    spatial_hash.insert( 7, p );
+    quadtree.insert( 7, p );
     
     // 0
     let p = Vector::new(0.0, 0.0);
     particles.push( p );
-    spatial_hash.insert( 8, p );
+    quadtree.insert( 8, p );
     
     // 3
     let p = Vector::new(10.0, 10.0);
     particles.push( p );
-    spatial_hash.insert( 9, p );
+    quadtree.insert( 9, p );
     
     // 3
     let p = Vector::new(10.0, 10.0);
     particles.push( p );
-    spatial_hash.insert( 10, p );
+    quadtree.insert( 10, p );
     
     // 0
     let p = Vector::new(4.8, 5.2);
     particles.push( p );
-    spatial_hash.insert( 11, p );
+    quadtree.insert( 11, p );
     
     // 0
     let p = Vector::new(5.2, 4.8);
     particles.push( p );
-    spatial_hash.insert( 12, p );
+    quadtree.insert( 12, p );
     
-    let (c_o, c_m) = spatial_hash.collision_check_with_comparisons();
+    let c_o = quadtree.collision_check();
     
     let (c_n_o, c_n_m) = collision_check(2.0, &particles);
     
     let mut v1 = collision_pairs(c_o);
     let mut v2 = collision_pairs(c_n_o);
     
-    let mut v3 = collision_pairs2(c_m);
-    let mut v4 = collision_pairs2(c_n_m);
+    // let mut v3 = collision_pairs2(c_m);
+    // let mut v4 = collision_pairs2(c_n_m);
     
     v1.sort();
     v2.sort();
@@ -201,8 +202,9 @@ fn test_collisions_2x2_non_random() {
 }
 
 #[test]
-fn test_collisions_2x2() {
-    let mut spatial_hash = SpatialHash::new(10.0, 10.0, 2, 2, 2.0);
+fn test_collisions_2x2() {    
+    let mut quadtree = Quadtree::new(0, 2.0, Vector::new(5.0, 5.0), 10.0, 10.0);
+
     
     let mut particles = Vec::new();
     
@@ -212,19 +214,17 @@ fn test_collisions_2x2() {
         let p = Vector::new(x, y);
         particles.push( p );
 
-        spatial_hash.insert( i, p );
+        quadtree.insert( i, p );
     }
-    let (c_o, c_m) = spatial_hash.collision_check_with_comparisons();
+    let c_o = quadtree.collision_check();
     
     let (c_n_o, c_n_m) = collision_check(2.0, &particles);
     
     let mut v1 = collision_pairs(c_o);
     let mut v2 = collision_pairs(c_n_o);
     
-    let mut v3 = collision_pairs2(c_m);
     v1.sort();
     v2.sort();
-    v3.sort();
         
     let e = equal_sets(v1, v2);
     
@@ -233,7 +233,7 @@ fn test_collisions_2x2() {
 
 #[test]
 fn test_collisions_3x3() {
-    let mut spatial_hash = SpatialHash::new(30.0, 30.0, 3, 3, 2.0);
+    let mut quadtree = Quadtree::new(0, 2.0, Vector::new(15.0, 15.0), 30.0, 30.0);
     
     let mut particles = Vec::new();
     
@@ -243,9 +243,9 @@ fn test_collisions_3x3() {
         let p = Vector::new(x, y);
         particles.push( p );
 
-        spatial_hash.insert( i, p );
+        quadtree.insert( i, p );
     }
-    let (c_o, c_m) = spatial_hash.collision_check_with_comparisons();
+    let (c_o, c_m) = quadtree.collision_check_with_comparisons();
     
     let (c_n_o, c_n_m) = collision_check(2.0, &particles);
     
@@ -265,7 +265,7 @@ fn test_collisions_3x3() {
 
 #[test]
 fn test_collisions_10x10() {
-    let mut spatial_hash = SpatialHash::new(100.0, 100.0, 10, 10, 2.0);
+    let mut quadtree = Quadtree::new(0, 2.0, Vector::new(50.0, 50.0), 100.0, 100.0);
     
     let mut particles = Vec::new();
     
@@ -275,9 +275,9 @@ fn test_collisions_10x10() {
         let p = Vector::new(x, y);
         particles.push( p );
 
-        spatial_hash.insert( i, p );
+        quadtree.insert( i, p );
     }
-    let (c_o, c_m) = spatial_hash.collision_check_with_comparisons();
+    let (c_o, c_m) = quadtree.collision_check_with_comparisons();
     
     let (c_n_o, c_n_m) = collision_check(2.0, &particles);
     
@@ -297,19 +297,19 @@ fn test_collisions_10x10() {
 
 #[test]
 fn test_collisions_2048x1536() {
-    let mut spatial_hash = SpatialHash::new(2048.0, 1536.0, 10, 10, 20.0);
-    
+    let mut quadtree = Quadtree::new(0, 20.0, Vector::new(1024.0, 768.0), 2048.0, 1536.0);
+
     let mut particles = Vec::new();
     
-    for i in 0..10000 {
+    for i in 0..100 {
         let x = rand::random::<f64>() * 2048.0;
         let y = rand::random::<f64>() * 1536.0;
         let p = Vector::new(x, y);
         particles.push( p );
 
-        spatial_hash.insert( i, p );
+        quadtree.insert( i, p );
     }
-    let (c_o, c_m) = spatial_hash.collision_check_with_comparisons();
+    let (c_o, c_m) = quadtree.collision_check_with_comparisons();
     
     let (c_n_o, c_n_m) = collision_check(20.0, &particles);
     

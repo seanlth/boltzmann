@@ -10,6 +10,4 @@ out vec4 Target0;
 void main() {
     float alpha = ceil(max(1-dot(VertexIn.uv, VertexIn.uv), 0));
     Target0 = vec4(VertexIn.colour.xyz, VertexIn.colour.w*alpha);
-    // Target0 = VertexIn.colour;
-    // Target0 = vec4(1.0, 1.0, 1.0, 1.0);
 }

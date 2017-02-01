@@ -470,7 +470,8 @@ use std::fs::File;
 
 use boltzmann::simulator::Simulator;
 use boltzmann::collision::SpatialPartition;
-use boltzmann::spatial_hash::*;
+use boltzmann::spatial_hash::SpatialHash;
+use boltzmann::quadtree::Quadtree;
 use boltzmann::vector::Vector;
 use boltzmann::particle::Particle;
 
@@ -611,11 +612,11 @@ fn draw<T: SpatialPartition>(display: GlutinFacade, program: Program, mut simula
 }
 
 fn main() {
-    let number_of_particles = 2000;
+    let number_of_particles = 10000;
     
     if let Some( (display, program) ) = setup_glium() {
         let (width, height): (u32, u32) = display.get_window().unwrap().get_inner_size_pixels().unwrap();
-        let simulator = Simulator::<SpatialHash>::new(number_of_particles, 10.0, -9.8, 0.4, width as f64, height as f64, 0.01);
+        let simulator = Simulator::<Quadtree>::new(number_of_particles, 5.0, 0.0, 1.0, width as f64, height as f64, 0.01);
         let (vertex_buffer, index_buffer) = create_buffer(&display, number_of_particles);
         draw(display, program, simulator, vertex_buffer, index_buffer);
     }
