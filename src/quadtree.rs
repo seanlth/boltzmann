@@ -15,7 +15,19 @@ pub struct Quadtree {
 
 #[allow(dead_code)]
 impl Quadtree {
-    pub fn new(level: usize, radius: f64, position: Vector, width: f64, height: f64) -> Quadtree {
+    pub fn new(width: f64, height: f64, radius: f64) -> Quadtree {
+        Quadtree {
+            empty: true,
+            level: 0,
+            radius: radius,
+            position: Vector::new(width/2.0, height/2.0),
+            width: width,
+            height: height,
+            objects: vec![],
+            children: None
+        }
+    }
+    fn child(level: usize, radius: f64, position: Vector, width: f64, height: f64) -> Quadtree {
         Quadtree {
             empty: true,
             level: level,
@@ -48,16 +60,16 @@ impl Quadtree {
     // creates children nodes and inserts objects from this node to children
     pub fn divide(&mut self) {
         let p1 = Vector::new(self.position.x - self.width/4.0, self.position.y + self.height/4.0);
-        let c1 = Box::new( Quadtree::new(self.level+1, self.radius, p1, self.width/2.0, self.height/2.0) );
+        let c1 = Box::new( Quadtree::child(self.level+1, self.radius, p1, self.width/2.0, self.height/2.0) );
 
         let p2 = Vector::new(self.position.x + self.width/4.0, self.position.y + self.height/4.0);
-        let c2 = Box::new( Quadtree::new(self.level+1, self.radius, p2, self.width/2.0, self.height/2.0) );
+        let c2 = Box::new( Quadtree::child(self.level+1, self.radius, p2, self.width/2.0, self.height/2.0) );
 
         let p3 = Vector::new(self.position.x - self.width/4.0, self.position.y - self.height/4.0);
-        let c3 = Box::new( Quadtree::new(self.level+1, self.radius, p3, self.width/2.0, self.height/2.0) );
+        let c3 = Box::new( Quadtree::child(self.level+1, self.radius, p3, self.width/2.0, self.height/2.0) );
 
         let p4 = Vector::new(self.position.x + self.width/4.0, self.position.y - self.height/4.0);
-        let c4 = Box::new( Quadtree::new(self.level+1, self.radius, p4, self.width/2.0, self.height/2.0) );
+        let c4 = Box::new( Quadtree::child(self.level+1, self.radius, p4, self.width/2.0, self.height/2.0) );
 
         self.children = Some((c1, c2, c3, c4));
 
@@ -78,6 +90,7 @@ impl Quadtree {
         }
         println!(" ]");
     }
+    
 }
 
 impl SpatialPartition for Quadtree {

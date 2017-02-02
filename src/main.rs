@@ -464,6 +464,7 @@ use glium::VertexBuffer;
 use glium::IndexBuffer;
 use glium::index::NoIndices;
 use glium::Surface;
+use glium::index::PrimitiveType;
 
 use std::io::prelude::*;
 use std::fs::File;
@@ -521,11 +522,51 @@ fn grey_to_jet(mut v: f64, min: f64, max: f64) -> (f32, f32, f32)
     (c_r as f32, c_g as f32, c_b as f32)
 }
 
+fn create_window(width: u32, height: u32, x: i32, y: i32, title: &str) -> GlutinFacade {
+    let w = glutin::WindowBuilder::new()
+        .with_title(title)
+        .with_dimensions(width, height)
+        .with_depth_buffer(24)
+        .build_glium()
+        .unwrap();
+        
+    w.get_window().unwrap().set_position(x, y);
+    
+    w
+}
+
+fn compile_shaders(display: &GlutinFacade, vertex_shader: &str, fragment_shader: &str, geometry_shader: Option<&str>) -> Option<Program> {
+    let vertex_shader_source = read_file(vertex_shader);
+    let fragment_shader_source = read_file(fragment_shader);
+    
+    let mut program = Err(glium::ProgramCreationError::CompilationError("Couldn't open vertex or fragmnet shader".to_string()));
+    
+    if let (Some(v), Some(f)) = (vertex_shader_source, fragment_shader_source) {
+        if let Some(geometry_shader) = geometry_shader {
+            if let Some(g) = read_file(geometry_shader) {
+                program = Program::from_source( display, &*v, &*f, Some(&*g) );
+            }
+        }
+        else {
+            program = Program::from_source( display, &*v, &*f, None );
+        }
+    }
+        
+    if let Err(error) = program {
+         println!("{:?}", error);
+    }
+    else if let Ok(p) = program {
+        return Some(p);
+    }
+    
+    None
+}
+
 fn setup_glium() -> Option<(GlutinFacade, Program)> {
-    implement_vertex!(Vertex, position, colour);
+    // implement_vertex!(Vertex, position, colour);
     
     let display = glutin::WindowBuilder::new()
-        .with_title("Particles")
+        .with_title("boltzmann")
         .with_depth_buffer(24)
         .build_glium()
         .unwrap();
@@ -567,6 +608,21 @@ fn create_buffer(display: &GlutinFacade, number_of_particles: usize) -> (VertexB
         } );
     }    
     ( VertexBuffer::dynamic(display, &vertices).unwrap(), NoIndices(glium::index::PrimitiveType::Points) )
+}
+
+fn create_plot_buffer(display: &GlutinFacade, number_of_points: usize) -> (VertexBuffer<Vertex>, IndexBuffer<u16>) {
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
+    
+    for i in 0..number_of_points {
+        vertices.push( Vertex {
+            position: [ 0.0, 0.0 ],
+            colour: [ 1.0, 1.0, 1.0, 1.0 ]
+        } );
+        indices.push( i as u16 );
+    }
+    ( VertexBuffer::dynamic(display, &vertices).unwrap(), IndexBuffer::new(display, PrimitiveType::LineStrip, &*indices).unwrap() )
+
 }
 
 fn draw<T: SpatialPartition>(display: GlutinFacade, program: Program, mut simulator: Simulator<T>, vertex_buffer: VertexBuffer<Vertex>, index_buffer: NoIndices) {    
@@ -612,14 +668,33 @@ fn draw<T: SpatialPartition>(display: GlutinFacade, program: Program, mut simula
 }
 
 fn main() {
-    let number_of_particles = 10000;
+    let number_of_particles = 5000;
+        
+    let width = 512;
+    let height = 512;
     
-    if let Some( (display, program) ) = setup_glium() {
-        let (width, height): (u32, u32) = display.get_window().unwrap().get_inner_size_pixels().unwrap();
-        let simulator = Simulator::<Quadtree>::new(number_of_particles, 5.0, 0.0, 1.0, width as f64, height as f64, 0.01);
-        let (vertex_buffer, index_buffer) = create_buffer(&display, number_of_particles);
-        draw(display, program, simulator, vertex_buffer, index_buffer);
+    implement_vertex!(Vertex, position, colour);
+    let simulator_display = create_window(width, height, 664, 114, "boltzmann");
+    let plotter_display = create_window(width, height, 152, 114, "Plot");
+    
+    
+    if let Some(program) = compile_shaders(&simulator_display, "shader/vertex.glsl", "shader/fragment.glsl", Some("shader/geometry.glsl")) {
+        let simulator = Simulator::<Quadtree>::new(number_of_particles, 2.0, 0.0, 0.3, width as f64, height as f64, 0.0005);
+        let (vertex_buffer, index_buffer) = create_buffer(&simulator_display, number_of_particles);
+        draw(simulator_display, program, simulator, vertex_buffer, index_buffer);
     }
     
+    // if let Some( (display, program) ) = setup_glium() {
+    //     let (width, height): (u32, u32) = display.get_window().unwrap().get_inner_size_pixels().unwrap();
+    //     let simulator = Simulator::<Quadtree>::new(number_of_particles, 5.0, 0.0, 1.0, width as f64, height as f64, 0.001);
+    //     let (vertex_buffer, index_buffer) = create_buffer(&display, number_of_particles);
+    //     draw(display, program, simulator, vertex_buffer, index_buffer);
+    // }
+    // if let Some( (display, program) ) = setup_glium() {
+    //     let (width, height): (u32, u32) = display.get_window().unwrap().get_inner_size_pixels().unwrap();
+    //     let simulator = Simulator::<SpatialHash>::new(number_of_particles, 20.0, 0.0, 1.0, width as f64, height as f64, 0.001);
+    //     let (vertex_buffer, index_buffer) = create_buffer(&display, number_of_particles);
+    //     draw(display, program, simulator, vertex_buffer, index_buffer);
+    // }
     
 }

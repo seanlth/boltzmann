@@ -23,7 +23,7 @@ impl Simulator<Quadtree> {
     pub fn new(number_of_particles: usize, radius: f64, gravity: f64, elasticity: f64, width: f64, height: f64, dt: f64) -> Simulator<Quadtree> {
         
         let mut s = Simulator {
-            spatial_partition: Quadtree::new(0, radius, Vector::new(width/2.0, height/2.0), width, height),
+            spatial_partition: Quadtree::new(width, height, radius),
             particles: vec![],
             radius: radius,
             gravity: gravity,
@@ -41,7 +41,7 @@ impl Simulator<SpatialHash> {
     pub fn new(number_of_particles: usize, radius: f64, gravity: f64, elasticity: f64, width: f64, height: f64, dt: f64) -> Simulator<SpatialHash> {
 
         let mut s = Simulator {
-            spatial_partition: SpatialHash::new(width, height, 45, 45, radius),
+            spatial_partition: SpatialHash::new(width, height, 800, 800, radius),
             particles: vec![],
             radius: radius,
             gravity: gravity,

@@ -113,8 +113,8 @@ fn collision_pairs2(comparisons: Vec<(usize, usize)>) -> Vec<P> {
 
 #[test]
 fn quadtree_test_collisions_2x2_non_random() {
-    let mut quadtree = Quadtree::new(0, 2.0, Vector::new(5.0, 5.0), 10.0, 10.0);
-    
+    let mut quadtree = Quadtree::new(10.0, 10.0, 2.0);
+
     let mut particles = Vec::new();
     
     
@@ -203,7 +203,7 @@ fn quadtree_test_collisions_2x2_non_random() {
 
 #[test]
 fn test_collisions_2x2() {    
-    let mut quadtree = Quadtree::new(0, 2.0, Vector::new(5.0, 5.0), 10.0, 10.0);
+    let mut quadtree = Quadtree::new(10.0, 10.0, 2.0);
 
     
     let mut particles = Vec::new();
@@ -233,8 +233,8 @@ fn test_collisions_2x2() {
 
 #[test]
 fn test_collisions_3x3() {
-    let mut quadtree = Quadtree::new(0, 2.0, Vector::new(15.0, 15.0), 30.0, 30.0);
-    
+    let mut quadtree = Quadtree::new(30.0, 30.0, 2.0);
+
     let mut particles = Vec::new();
     
     for i in 0..100 {
@@ -265,8 +265,8 @@ fn test_collisions_3x3() {
 
 #[test]
 fn test_collisions_10x10() {
-    let mut quadtree = Quadtree::new(0, 2.0, Vector::new(50.0, 50.0), 100.0, 100.0);
-    
+    let mut quadtree = Quadtree::new(100.0, 100.0, 2.0);
+
     let mut particles = Vec::new();
     
     for i in 0..100 {
@@ -297,7 +297,7 @@ fn test_collisions_10x10() {
 
 #[test]
 fn test_collisions_2048x1536() {
-    let mut quadtree = Quadtree::new(0, 20.0, Vector::new(1024.0, 768.0), 2048.0, 1536.0);
+    let mut quadtree = Quadtree::new(2048.0, 1536.0, 20.0);
 
     let mut particles = Vec::new();
     
