@@ -259,10 +259,10 @@ fn main() {
     implement_vertex!(Vertex, position, colour);
 
     // define simulation constants
-    let number_of_particles = 10000;
+    let number_of_particles = 10;
     let number_of_data_points = 500;
-    let dt = 0.00005;
-    let radius = 1.5;
+    let dt = 0.005;
+    let radius = 20.0;
     let gravity = 0.0;
     let restitution = 1.0;
     let width = 512;
@@ -280,7 +280,7 @@ fn main() {
 
     
     if let (Some(s), Some(p)) = (simulator_program, plotter_program) {
-        let mut simulator = Simulator::<Quadtree>::new(number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
+        let mut simulator = Simulator::<SpatialHash>::new(number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
         let (vertex_buffer, index_buffer) = create_buffer(&simulator_display, number_of_particles);
         let (plotter_vertex_buffer, plotter_index_buffer) = create_plot_buffer(&plotter_display, number_of_data_points);
         
