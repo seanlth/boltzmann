@@ -4,8 +4,6 @@ use particle::Particle;
 use std::cmp::Ordering;
 
 
-
-
 pub struct Collision {
     pub p1: usize,
     pub p2: usize,
