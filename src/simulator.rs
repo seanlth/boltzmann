@@ -18,46 +18,23 @@ pub struct Simulator<T: SpatialPartition> {
     pub dt: f64
 }
 
-
-impl Simulator<Quadtree> {
-    pub fn new(number_of_particles: usize, radius: f64, gravity: f64, restitution: f64, width: f64, height: f64, dt: f64) -> Simulator<Quadtree> {
-        
-        let mut s = Simulator {
-            spatial_partition: Quadtree::new(width, height, radius),
-            particles: vec![],
-            radius: radius,
-            gravity: gravity,
-            restitution: restitution,
-            width: width,
-            height: height,
-            dt: dt
-        };
-        s.setup_particles(number_of_particles, width, height, dt);
-        s
-    }
-}
-
-impl Simulator<SpatialHash> {
-    pub fn new(number_of_particles: usize, radius: f64, gravity: f64, restitution: f64, width: f64, height: f64, dt: f64) -> Simulator<SpatialHash> {
-
-        let mut s = Simulator {
-            spatial_partition: SpatialHash::new(width, height, 800, 800, radius),
-            particles: vec![],
-            radius: radius,
-            gravity: gravity,
-            restitution: restitution,
-            width: width,
-            height: height,
-            dt: dt
-        };
-        s.setup_particles(number_of_particles, width, height, dt);
-        s
-    }
-}
-
-
 #[allow(dead_code)]
 impl<T: SpatialPartition> Simulator<T> {
+    pub fn new(spatial_partition: T, number_of_particles: usize, radius: f64, gravity: f64, restitution: f64, width: f64, height: f64, dt: f64) -> Simulator<T> {
+        
+        let mut s = Simulator {
+            spatial_partition: spatial_partition,
+            particles: vec![],
+            radius: radius,
+            gravity: gravity,
+            restitution: restitution,
+            width: width,
+            height: height,
+            dt: dt
+        };
+        s.setup_particles(number_of_particles, width, height, dt);
+        s
+    }
 
     fn setup_particles(&mut self, number_of_particles: usize, width: f64, height: f64, dt: f64) {
 
@@ -89,6 +66,14 @@ impl<T: SpatialPartition> Simulator<T> {
             vs.push(v.magnitude());
         }
         vs
+    }
+    
+    pub fn positions(&self) -> Vec<Vector> {
+        let mut ps = Vec::new();
+        for p in &self.particles {
+            ps.push( p.get_position() );
+        }
+        ps
     }
 
     // total engery in system
@@ -155,51 +140,49 @@ impl<T: SpatialPartition> Simulator<T> {
             }
         }
     }
+    
+    fn boundary_check(p: &mut Particle, radius: f64, restitution: f64, width: f64, height: f64) {
 
-    // check particles are within the boundaries
-    fn boundary_check(&mut self) {
-
-        for p in &mut self.particles {
-            let position = p.get_position();
-            let velocity = p.get_velocity();
-            if position.x - self.radius < 0.0 {
-                p.set_position( Vector::new( self.radius, position.y ) );
-                p.set_velocity( Vector::new( velocity.x.abs()*self.restitution, velocity.y ) );
-            }
-            let position = p.get_position();
-            let velocity = p.get_velocity();
-            if position.x + self.radius > self.width as f64 {
-                p.set_position( Vector::new( self.width as f64 - self.radius, position.y ) );
-                p.set_velocity( Vector::new( - velocity.x.abs()*self.restitution, velocity.y ) );
-            }
-            let position = p.get_position();
-            let velocity = p.get_velocity();
-            if position.y - self.radius < 0.0 {
-                p.set_position( Vector::new( position.x, self.radius ) );
-                p.set_velocity( Vector::new( velocity.x, velocity.y.abs()*self.restitution ) );
-            }
-            let position = p.get_position();
-            let velocity = p.get_velocity();
-            if position.y + self.radius > self.height as f64 {
-                p.set_position( Vector::new( position.x, self.height as f64 - self.radius ) );
-                p.set_velocity( Vector::new( velocity.x, - velocity.y.abs()*self.restitution ) );
-            }
+        // for p in &mut self.particles {
+        let position = p.get_position();
+        let velocity = p.get_velocity();
+        if position.x - radius < 0.0 {
+            p.set_position( Vector::new( radius, position.y ) );
+            p.set_velocity( Vector::new( velocity.x.abs()*restitution, velocity.y ) );
+        }
+        let position = p.get_position();
+        let velocity = p.get_velocity();
+        if position.x + radius > width as f64 {
+            p.set_position( Vector::new( width as f64 - radius, position.y ) );
+            p.set_velocity( Vector::new( - velocity.x.abs()*restitution, velocity.y ) );
+        }
+        let position = p.get_position();
+        let velocity = p.get_velocity();
+        if position.y - radius < 0.0 {
+            p.set_position( Vector::new( position.x, radius ) );
+            p.set_velocity( Vector::new( velocity.x, velocity.y.abs()*restitution ) );
+        }
+        let position = p.get_position();
+        let velocity = p.get_velocity();
+        if position.y + radius > height as f64 {
+            p.set_position( Vector::new( position.x, height as f64 - radius ) );
+            p.set_velocity( Vector::new( velocity.x, - velocity.y.abs()*restitution ) );
         }
     }
+
 
     // call from main loop
     pub fn update(&mut self) {
         self.solve_collisions();
-        self.boundary_check();
 
         self.spatial_partition.clear();
 
         // apply gravity
         for (i, mut p) in &mut self.particles.iter_mut().enumerate() {
             p.verlet( Vector::new(0.0, self.gravity) );
+            Self::boundary_check(p, self.radius, self.restitution, self.width, self.height);
             self.spatial_partition.insert(i, p.get_position())
         }
-
     }
 
 }

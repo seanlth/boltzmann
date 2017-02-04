@@ -4,6 +4,10 @@ extern crate glium;
 extern crate boltzmann;
 extern crate rand;
 
+use std::io::prelude::*;
+use std::fs::File;
+use std::cmp;
+
 use glium::glutin;
 use glium::DisplayBuild;
 use glium::Program;
@@ -14,11 +18,10 @@ use glium::index::NoIndices;
 use glium::Surface;
 use glium::index::PrimitiveType;
 
-use std::io::prelude::*;
-use std::fs::File;
 
 use boltzmann::simulator::Simulator;
 use boltzmann::collision::SpatialPartition;
+use boltzmann::vector::*;
 
 #[allow(unused_imports)]
 use boltzmann::spatial_hash::SpatialHash;
@@ -39,6 +42,19 @@ fn read_file(file_name: &str) -> Option<String> {
         r = Some(s)
     }
     r
+}
+
+// [start1, end1] => [start2, end2]
+// [start1 - start1, end1 - start1 ] => [start2, end2]
+// [0, end1 - start1] => [start2, end2]
+// [0, end1 - start1 / end1 - start1 ] => [start2, end2]
+// [0, 1] => [start2, end2]
+// [0, 1 * (end2 - start2) ] => [start2, end2]
+// [start2, end2 - start2 + start2] => [start2, end2]
+fn scale(x: f64, scale1: [f64; 2], scale2: [f64; 2]) -> f64 {
+    let a = (x - scale1[0]) / (scale1[1] - scale1[0]);
+    let b = a * (scale2[1] - scale2[0]);
+    b + scale2[0]
 }
 
 fn grey_to_jet(mut v: f64, min: f64, max: f64) -> (f32, f32, f32)
@@ -91,7 +107,6 @@ fn velocity_density(velocities: Vec<f64>, bins: usize) -> Box<Fn(f64) -> f64> {
     let max_velocity = velocities.iter().cloned().fold(0./0., f64::max);
     let mut max = 0.0;
 
-    // [0, max] => [0, bins] 
     for v in velocities {
         
         let i = ( bins as f64 * v / max_velocity ) as usize;
@@ -117,6 +132,25 @@ fn velocity_density(velocities: Vec<f64>, bins: usize) -> Box<Fn(f64) -> f64> {
     };
 
     Box::new(f)
+}
+
+fn particle_density(positions: Vec<Vector>, width: f64, height: f64, number_of_rows: usize, number_of_columns: usize) -> (Vec<usize>, usize) {
+    let mut bins = vec![0; number_of_rows*number_of_columns];
+    let mut max = 0;
+    
+    let cell_width = width / number_of_columns as f64;
+    let cell_height = height / number_of_rows as f64;
+
+    for p in positions {
+        let r = (p.y / cell_height) as usize;
+        let c = (p.x / cell_width) as usize;
+        
+
+        bins[r*number_of_columns + c] += 1;
+        max = cmp::max( bins[r*number_of_columns + c], max );
+    }
+    
+    (bins, max)
 }
 
 fn create_window(width: u32, height: u32, x: i32, y: i32, title: &str) -> GlutinFacade {
@@ -226,6 +260,7 @@ fn display<T: SpatialPartition>(display: &GlutinFacade, program: &Program, simul
 fn plot<T: SpatialPartition>(display: &GlutinFacade, program: &Program, simulator: &Simulator<T>, vertex_buffer: &VertexBuffer<Vertex>, index_buffer: &IndexBuffer<u16>, number_of_points: usize) {
     let params = glium::DrawParameters {
         line_width: Some(2.0),
+        point_size: Some(5.0),
         blend: glium::Blend::alpha_blending(),
         .. Default::default()    
     };
@@ -233,62 +268,109 @@ fn plot<T: SpatialPartition>(display: &GlutinFacade, program: &Program, simulato
     let mut target = display.draw();
     target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
 
-    let number_of_bins = 500;
+    let number_of_bins = 50;
     
     let vs = velocity_density(simulator.velocities(), number_of_bins);
     let mut points = Vec::new();
     for i in 0..number_of_points {
-        let t = i as f32 / (number_of_points as f32 - 1.0); //[0 - 1]
-        let x = t * 2.0 - 1.0;
-        let y = vs(t as f64 * number_of_bins as f64) as f32 * 1.5 - 1.0;
+        let x = scale(i as f64, [0.0, number_of_points as f64-1.0], [-1.0, 1.0]) as f32;
+        let t = vs(scale(i as f64, [0.0, number_of_points as f64-1.0], [0.0, number_of_bins as f64 -1.0]));
+        let y = scale(t, [0.0, 1.0], [-1.0, 0.8]) as f32;
         
         points.push( Vertex {
-            position: [ x, y],
+            position: [ x, y ],
             colour: [ 0.0, 1.0, 1.0, 1.0 ]
         } );
     }
     vertex_buffer.write(&*points);
 
     target.draw(vertex_buffer, index_buffer, program, &glium::uniforms::EmptyUniforms, &params).unwrap();
-    
-    target.finish().unwrap();
-            
+    target.draw(vertex_buffer, glium::index::NoIndices(glium::index::PrimitiveType::Points), program, &glium::uniforms::EmptyUniforms, &params).unwrap();
+
+    target.finish().unwrap();        
 }
+
+
+fn density<T: SpatialPartition>(display: &GlutinFacade, program: &Program, simulator: &Simulator<T>, vertex_buffer: &VertexBuffer<Vertex>, number_of_rows: usize, number_of_columns: usize) {
+    
+    let params = glium::DrawParameters {
+        // point_size: Some(5.0),
+        blend: glium::Blend::alpha_blending(),
+        .. Default::default()    
+    };
+    
+    let uniforms = uniform! {
+        u_Aspect: simulator.height as f32 / simulator.width as f32,
+        radius: 1.0 * (simulator.width / number_of_columns as f64 - 1.0) as f32 / simulator.height as f32
+    };
+    let mut target = display.draw();
+    target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
+
+    
+    let (bins, max) = particle_density(simulator.positions(), simulator.width, simulator.height, number_of_rows, number_of_columns);
+    let mut points = Vec::new();
+    for i in 0..number_of_columns*number_of_rows {
+        let r = i / number_of_columns;
+        let c = i % number_of_columns;
+        
+        let x = scale(c as f64, [-1.0, number_of_columns as f64], [-1.0, 1.0]) as f32;
+        let y = scale(r as f64, [-1.0, number_of_rows as f64], [-1.0, 1.0]) as f32;
+
+        println!("{}", i);
+        let (r, g, b) = grey_to_jet(bins[i] as f64, 0.0, max as f64);            
+        points.push( Vertex {
+            position: [ x, y ],
+            colour: [ r, g, b, 1.0 ]
+        } );
+    }
+    vertex_buffer.write(&*points);
+
+    target.draw(vertex_buffer, glium::index::NoIndices(glium::index::PrimitiveType::Points), program, &uniforms, &params).unwrap();
+
+    target.finish().unwrap();        
+}
+
 
 fn main() {
     implement_vertex!(Vertex, position, colour);
-
+    
     // define simulation constants
-    let number_of_particles = 10;
-    let number_of_data_points = 500;
-    let dt = 0.005;
-    let radius = 20.0;
+    let number_of_particles = 5000;
+    let number_of_data_points = 1000;
+    let dt = 0.0005;
+    let radius = 2.0;
     let gravity = 0.0;
     let restitution = 1.0;
     let width = 512;
     let height = 512;
     
     // create windows 
-    let simulator_display = create_window(width, height, 664, 114, "boltzmann");
-    let plotter_display = create_window(width, height, 152, 114, "Plot");
-    
+    let simulator_display = create_window(width, height, 664, 50, "boltzmann");
+    let density_display = create_window(width, height, 152, 50, "density");
+    let plotter_display = create_window(width, height/3, 664, 586, "plot");
+
     // compile shaders 
     let simulator_program = compile_shaders(&simulator_display, "shader/vertex.glsl", 
                                             "shader/fragment.glsl", Some("shader/geometry.glsl"));
     let plotter_program = compile_shaders(&plotter_display, "shader/plotter_vertex.glsl", 
                                           "shader/plotter_fragment.glsl", None);
-
+    let density_program = compile_shaders(&density_display, "shader/density_vertex.glsl", 
+                                            "shader/density_fragment.glsl", Some("shader/density_geometry.glsl"));
     
-    if let (Some(s), Some(p)) = (simulator_program, plotter_program) {
-        let mut simulator = Simulator::<SpatialHash>::new(number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
+    if let (Some(s), Some(p), Some(d)) = (simulator_program, plotter_program, density_program) {
+        let quad = Quadtree::new(width as f64, height as f64, radius);
+        let hash = SpatialHash::new(width as f64, height as f64, 25, 25, radius).unwrap();
+        let mut simulator = Simulator::new(quad, number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
         let (vertex_buffer, index_buffer) = create_buffer(&simulator_display, number_of_particles);
         let (plotter_vertex_buffer, plotter_index_buffer) = create_plot_buffer(&plotter_display, number_of_data_points);
-        
+        let (density_vertex_buffer, _) = create_buffer(&density_display, 2500);
+
         loop {
+            simulator.update();
             display(&simulator_display, &s, &simulator, &vertex_buffer, &index_buffer);
             plot(&plotter_display, &p, &simulator, &plotter_vertex_buffer, &plotter_index_buffer, number_of_data_points);
-            simulator.update();
+            density(&density_display, &d, &simulator, &density_vertex_buffer, 50, 50);
         }
-
+    
     }
 }

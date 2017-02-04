@@ -13,14 +13,22 @@ pub struct SpatialHash {
 }
 
 impl SpatialHash {
-    pub fn new(width: f64, height: f64, number_of_columns: usize, number_of_rows: usize, radius: f64) -> SpatialHash {
-        SpatialHash {
-            cells: vec![vec![]; (number_of_columns+2)*(number_of_rows+2)],
-            number_of_columns: number_of_columns,
-            number_of_rows: number_of_rows,
-            cell_width: width / number_of_columns as f64,
-            cell_height: height / number_of_rows as f64,
-            radius: radius
+    pub fn new(width: f64, height: f64, number_of_columns: usize, number_of_rows: usize, radius: f64) -> Option<SpatialHash> {
+        let max_number_of_columns = (width / radius.ceil()) as usize;
+        let max_number_of_rows = (height / radius.ceil()) as usize;
+        
+        if number_of_rows > max_number_of_rows || number_of_columns > max_number_of_columns {
+            None
+        }
+        else {
+            Some(SpatialHash {
+                cells: vec![vec![]; (number_of_columns+2)*(number_of_rows+2)],
+                number_of_columns: number_of_columns,
+                number_of_rows: number_of_rows,
+                cell_width: width / number_of_columns as f64,
+                cell_height: height / number_of_rows as f64,
+                radius: radius
+            })
         }
     }
     fn in_cell(&self, v: Vector) -> (i32, i32) {
@@ -37,11 +45,13 @@ impl SpatialHash {
 
 impl SpatialPartition for SpatialHash {
     fn insert(&mut self, index: usize, v: Vector) {
-        
         let (row, column) = self.in_cell(v);
-        
+        // let bound_height = f64::floor(2.0 * self.radius / self.cell_height) as i32; 
+        // let bound_width = f64::floor(2.0 * self.radius / self.cell_width) as i32; 
         let (r, c) = (cmp::min(row, self.number_of_rows as i32 -1), cmp::min(column, self.number_of_columns as i32 -1));
         
+    
+
         for i in -1..2 {
             for j in -1..2 {
                 let cell_index = self.get_cell_index(r+i as i32, c+j as i32);

@@ -124,6 +124,3 @@ impl Neg for Vector {
         Vector::new(-self.x, -self.y)
     }
 }
-
-pub const ZERO_VECTOR: Vector = Vector { x: 0.0, y: 0.0 };
-pub const MAX_VECTOR: Vector = Vector { x: f64::MAX, y: f64::MAX };

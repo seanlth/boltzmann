@@ -1,0 +1,8 @@
+number_of_particles = 1000
+number_of_data_points = 500
+dt = 0.0005
+radius = 5.0
+gravity = 0.0
+restitution = 1.0
+width = 512
+height = 512
