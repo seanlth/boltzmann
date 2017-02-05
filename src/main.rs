@@ -4,8 +4,6 @@ extern crate glium;
 extern crate boltzmann;
 extern crate rand;
 
-use std::io::prelude::*;
-use std::fs::File;
 use std::cmp;
 
 use glium::glutin;
@@ -27,21 +25,12 @@ use boltzmann::vector::*;
 use boltzmann::spatial_hash::SpatialHash;
 #[allow(unused_imports)]
 use boltzmann::quadtree::Quadtree;
+use boltzmann::config::*;
 
 #[derive(Copy, Clone)]
 struct Vertex {
     position: [f32; 2],
     colour: [f32; 4],
-}
-
-fn read_file(file_name: &str) -> Option<String> {
-    let mut r = None;
-    if let Ok(mut f) = File::open(file_name) {
-        let mut s = String::new();
-        let _ = f.read_to_string(&mut s);
-        r = Some(s)
-    }
-    r
 }
 
 // [start1, end1] => [start2, end2]
@@ -299,9 +288,11 @@ fn density<T: SpatialPartition>(display: &GlutinFacade, program: &Program, simul
         .. Default::default()    
     };
     
+    let radius = 1.0 * (simulator.width / number_of_columns as f64 - 1.0) as f32 / simulator.height as f32;
+    
     let uniforms = uniform! {
         u_Aspect: simulator.height as f32 / simulator.width as f32,
-        radius: 1.0 * (simulator.width / number_of_columns as f64 - 1.0) as f32 / simulator.height as f32
+        radius: radius
     };
     let mut target = display.draw();
     target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
@@ -312,11 +303,10 @@ fn density<T: SpatialPartition>(display: &GlutinFacade, program: &Program, simul
     for i in 0..number_of_columns*number_of_rows {
         let r = i / number_of_columns;
         let c = i % number_of_columns;
-        
-        let x = scale(c as f64, [-1.0, number_of_columns as f64], [-1.0, 1.0]) as f32;
-        let y = scale(r as f64, [-1.0, number_of_rows as f64], [-1.0, 1.0]) as f32;
+            
+        let x = scale(c as f64, [0.0, number_of_columns as f64-1.0], [-1.0 + radius as f64, 1.0 - radius as f64]) as f32;
+        let y = scale(r as f64, [0.0, number_of_rows as f64-1.0], [-1.0 + radius as f64, 1.0 - radius as f64]) as f32;
 
-        println!("{}", i);
         let (r, g, b) = grey_to_jet(bins[i] as f64, 0.0, max as f64);            
         points.push( Vertex {
             position: [ x, y ],
@@ -330,25 +320,28 @@ fn density<T: SpatialPartition>(display: &GlutinFacade, program: &Program, simul
     target.finish().unwrap();        
 }
 
-
 fn main() {
     implement_vertex!(Vertex, position, colour);
     
-    // define simulation constants
-    let number_of_particles = 5000;
-    let number_of_data_points = 1000;
-    let dt = 0.0005;
-    let radius = 2.0;
-    let gravity = 0.0;
-    let restitution = 1.0;
-    let width = 512;
-    let height = 512;
+    let config = read_config("simulation_config.toml");
     
+    // define simulation constants
+    let number_of_particles = config.number_of_particles.unwrap();
+    let number_of_data_points = config.number_of_data_points.unwrap();
+    let dt = config.dt.unwrap();
+    let radius = config.radius.unwrap();
+    let gravity = config.gravity.unwrap();
+    let restitution = config.restitution.unwrap();
+    let width = config.width.unwrap();
+    let height = config.height.unwrap();
+    let density_number_of_rows = config.density_number_of_rows.unwrap();
+    let density_number_of_columns = config.density_number_of_columns.unwrap();
+
     // create windows 
     let simulator_display = create_window(width, height, 664, 50, "boltzmann");
     let density_display = create_window(width, height, 152, 50, "density");
     let plotter_display = create_window(width, height/3, 664, 586, "plot");
-
+    
     // compile shaders 
     let simulator_program = compile_shaders(&simulator_display, "shader/vertex.glsl", 
                                             "shader/fragment.glsl", Some("shader/geometry.glsl"));
@@ -357,20 +350,42 @@ fn main() {
     let density_program = compile_shaders(&density_display, "shader/density_vertex.glsl", 
                                             "shader/density_fragment.glsl", Some("shader/density_geometry.glsl"));
     
-    if let (Some(s), Some(p), Some(d)) = (simulator_program, plotter_program, density_program) {
-        let quad = Quadtree::new(width as f64, height as f64, radius);
-        let hash = SpatialHash::new(width as f64, height as f64, 25, 25, radius).unwrap();
-        let mut simulator = Simulator::new(quad, number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
-        let (vertex_buffer, index_buffer) = create_buffer(&simulator_display, number_of_particles);
-        let (plotter_vertex_buffer, plotter_index_buffer) = create_plot_buffer(&plotter_display, number_of_data_points);
-        let (density_vertex_buffer, _) = create_buffer(&density_display, 2500);
-
-        loop {
-            simulator.update();
-            display(&simulator_display, &s, &simulator, &vertex_buffer, &index_buffer);
-            plot(&plotter_display, &p, &simulator, &plotter_vertex_buffer, &plotter_index_buffer, number_of_data_points);
-            density(&density_display, &d, &simulator, &density_vertex_buffer, 50, 50);
-        }
     
+    if let (Some(s), Some(p), Some(d)) = (simulator_program, plotter_program, density_program) {
+        
+        // create buffers 
+        let (particle_vertex_buffer, particle_index_buffer) = create_buffer(&simulator_display, number_of_particles);
+        let (plotter_vertex_buffer, plotter_index_buffer) = create_plot_buffer(&plotter_display, number_of_data_points);
+        let (density_vertex_buffer, _) = create_buffer(&density_display, density_number_of_rows * density_number_of_columns);
+        
+        
+        if let Some(spatial_hash) = config.spatial_hash {
+            
+            // use spatial hashing 
+            let hash = SpatialHash::new(width as f64, height as f64, spatial_hash.number_of_columns.unwrap(), spatial_hash.number_of_rows.unwrap(), radius).unwrap();
+            let mut simulator = Simulator::new(hash, number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
+            
+            // run simulation 
+            loop {
+                simulator.update();
+                display(&simulator_display, &s, &simulator, &particle_vertex_buffer, &particle_index_buffer);
+                plot(&plotter_display, &p, &simulator, &plotter_vertex_buffer, &plotter_index_buffer, number_of_data_points);
+                density(&density_display, &d, &simulator, &density_vertex_buffer, density_number_of_rows, density_number_of_columns);
+            }
+        }
+        else {
+            
+            // use quadtree
+            let quad = Quadtree::new(width as f64, height as f64, radius);
+            let mut simulator = Simulator::new(quad, number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
+
+            // run simulation 
+            loop {
+                simulator.update();
+                display(&simulator_display, &s, &simulator, &particle_vertex_buffer, &particle_index_buffer);
+                plot(&plotter_display, &p, &simulator, &plotter_vertex_buffer, &plotter_index_buffer, number_of_data_points);
+                density(&density_display, &d, &simulator, &density_vertex_buffer, density_number_of_rows, density_number_of_columns);
+            }
+        };
     }
 }

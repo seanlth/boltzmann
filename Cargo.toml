@@ -8,3 +8,5 @@ authors = ["hargados <hargados@tcd.ie>"]
 rand = "0.3"
 glutin = "0.7.1"
 glium = "*"
+toml = "0.2.1"
+rustc-serialize = "0.3.22"
