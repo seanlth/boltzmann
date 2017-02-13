@@ -27,7 +27,7 @@ mod tests {
             quadtree.insert( i, p );
         }
         
-        b.iter(|| quadtree.collision_check() );
+        b.iter(|| {let _ = quadtree.collision_check();} );
     }
     
     #[bench]
@@ -41,6 +41,6 @@ mod tests {
             quadtree.insert( i, p );
         }
         
-        b.iter(|| quadtree.collision_check_parallel() );
+        b.iter(|| { let _ = quadtree.collision_check_parallel(); } );
     }
 }

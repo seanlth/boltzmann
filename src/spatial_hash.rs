@@ -58,8 +58,19 @@ impl SpatialHash {
         b1 && b2 && b3 && b4
     }
     
+    fn contained(&self, r: i32, c: i32, p: Vector) -> bool {
+        let cell_position = Vector::new((c as f64 + 0.5) * self.cell_width, (r as f64 + 0.5) * self.cell_height);  
+        
+        let b1 = p.x-self.radius >= cell_position.x - self.cell_width/2.0;
+        let b2 = p.x+self.radius <= cell_position.x + self.cell_width/2.0;
+        let b3 = p.y-self.radius >= cell_position.y - self.cell_height/2.0;
+        let b4 = p.y+self.radius <= cell_position.y + self.cell_height/2.0;
+
+        b1 && b2 && b3 && b4
+    }
+    
     fn check_collisions_in_quadrant(&self, row: i32, column: i32, rows: usize, columns: usize) -> Vec<Collision> {
-        let mut collisions = Vec::new();
+        let mut collisions = Vec::with_capacity(1000);
         for r in 0..rows {
             for c in 0..columns {
                 let c = &self.cells[self.get_cell_index(r as i32 + row, c as i32 + column)];
@@ -82,6 +93,8 @@ impl SpatialHash {
                 }
             }
         }
+        collisions.sort();
+        collisions.dedup();
         collisions
     }
     
@@ -93,11 +106,17 @@ impl SpatialPartition for SpatialHash {
         let (row, column) = self.in_cell(v);
         let (r, c) = (cmp::min(row, self.number_of_rows as i32 -1), cmp::min(column, self.number_of_columns as i32 -1));
         
-        for i in -1..2 {
-            for j in -1..2 {
-                if self.within(r+i, c+j, v) {
-                    let cell_index = self.get_cell_index(r+i as i32, c+j as i32);
-                    self.cells[cell_index].push((index, v));
+        if self.contained(r, c, v) {
+            let cell_index = self.get_cell_index(r as i32, c as i32);
+            self.cells[cell_index].push((index, v));
+        }
+        else {
+            for i in -1..2 {
+                for j in -1..2 {
+                    if self.within(r+i, c+j, v) {
+                        let cell_index = self.get_cell_index(r+i as i32, c+j as i32);
+                        self.cells[cell_index].push((index, v));
+                    }
                 }
             }
         }

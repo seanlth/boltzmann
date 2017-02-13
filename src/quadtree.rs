@@ -127,26 +127,10 @@ impl Quadtree {
                 }
             }
         }
-        
-        // collisions.sort();
-        // collisions.dedup();
-    
-    
+        collisions.sort();
+        collisions.dedup();    
         collisions
     }
-    
-    fn collect_data<'a>(scoped: &Scope<'a>, cs1: &'a mut Vec<Collision>, c1: &'a Box<Quadtree>, 
-            cs2: &'a mut Vec<Collision>, c2: &'a Box<Quadtree>, 
-            cs3: &'a mut Vec<Collision>, c3: &'a Box<Quadtree>, 
-            cs4: &'a mut Vec<Collision>, c4: &'a Box<Quadtree> ) {
-        scoped.execute(move || { *cs1 = c1.walk_tree() });
-        scoped.execute(move || { *cs2 = c2.walk_tree() });
-        scoped.execute(move || { *cs3 = c3.walk_tree() });
-        scoped.execute(move || { *cs4 = c4.walk_tree() });
-    }
-    
-    
-    
 }
 impl SpatialPartition for Quadtree {
 
@@ -191,58 +175,9 @@ impl SpatialPartition for Quadtree {
 
         self.objects.clear();
         self.empty = true;
+        self.collisions.clear();
     }
     
-    
-    
-    // fn collision_check(&self) -> Vec<Collision> {
-    //     let mut collisions = Vec::new();
-    // 
-    // 
-    //     if let Some((ref c1, ref c2, ref c3, ref c4)) = self.children {
-    // 
-    //         let mut cs1 = Vec::new(); 
-    //         let mut cs2 = Vec::new(); 
-    //         let mut cs3 = Vec::new(); 
-    //         let mut cs4 = Vec::new(); 
-    //         
-    //         if let Some(ref p) = self.pool {
-    //             p.scoped(|scoped| {
-    //                 Self::collect_data(&scoped, &mut cs1, &c1, &mut cs2, &c2, &mut cs3, &c3, &mut cs4, &c4);
-    //             });
-    //             // println!("{}", cs1.len());
-    //             collisions.append( &mut cs1 );
-    //             collisions.append( &mut cs2 );
-    //             collisions.append( &mut cs3 );
-    //             collisions.append( &mut cs4 );
-    //         }  
-    //     }
-    //     
-    //     for i in 0..self.objects.len() {
-    //         let (index1, p_position) = self.objects[i];
-    //         // let p_position = particles[index1].get_position();
-    //     
-    //         for j in (i+1)..self.objects.len() {
-    //             let (index2, q_position) =  self.objects[j];
-    //             // let q_position = particles[index2].get_position();
-    //     
-    //             let normal = (q_position - p_position).normalise();
-    //             let penetration = 2.0*self.radius - p_position.distance( q_position );
-    //     
-    //             // if circles are overlapping
-    //             if penetration > 0.0 {
-    //                 // add collision
-    //                 collisions.push( Collision::new(index1, index2, penetration, normal) );
-    //             }
-    //         }
-    //     }
-    //     
-    //     collisions.sort();
-    //     collisions.dedup();
-    // 
-    //     collisions
-    // }
-
     fn collision_check(&mut self) -> &Vec<Collision> {
     
         if let Some((ref c1, ref c2, ref c3, ref c4)) = self.children {
@@ -333,10 +268,10 @@ impl SpatialPartition for Quadtree {
         let mut comparisons = Vec::new();
     
         if let Some((ref mut c1, ref mut c2, ref mut c3, ref mut c4)) = self.children {
-            let (mut collisions1, mut comparisons1) = c1.collision_check_with_comparisons();
-            let (mut collisions2, mut comparisons2) = c2.collision_check_with_comparisons();
-            let (mut collisions3, mut comparisons3) = c3.collision_check_with_comparisons();
-            let (mut collisions4, mut comparisons4) = c4.collision_check_with_comparisons();
+            let (collisions1, mut comparisons1) = c1.collision_check_with_comparisons();
+            let (collisions2, mut comparisons2) = c2.collision_check_with_comparisons();
+            let (collisions3, mut comparisons3) = c3.collision_check_with_comparisons();
+            let (collisions4, mut comparisons4) = c4.collision_check_with_comparisons();
                         
             self.collisions.append(&mut collisions1.clone());
             self.collisions.append(&mut collisions2.clone());

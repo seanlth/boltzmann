@@ -27,7 +27,7 @@ mod tests {
             spatial_hash.insert( i, p );
         }
         
-        b.iter(|| spatial_hash.collision_check() );
+        b.iter(|| {let _ = spatial_hash.collision_check(); });
     }
     
     #[bench]
@@ -41,6 +41,6 @@ mod tests {
             spatial_hash.insert( i, p );
         }
         
-        b.iter(|| spatial_hash.collision_check_parallel() );
+        b.iter(|| {let _ = spatial_hash.collision_check_parallel();} );
     }
 }
