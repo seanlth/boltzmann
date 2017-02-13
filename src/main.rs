@@ -5,6 +5,7 @@ extern crate boltzmann;
 extern crate rand;
 
 use std::cmp;
+use std::ops::Index;
 
 use glium::glutin;
 use glium::DisplayBuild;
@@ -20,6 +21,9 @@ use glium::index::PrimitiveType;
 use boltzmann::simulator::Simulator;
 use boltzmann::collision::SpatialPartition;
 use boltzmann::vector::*;
+use boltzmann::attribute::*;
+use boltzmann::common::*;
+use boltzmann::drawing::*;
 
 #[allow(unused_imports)]
 use boltzmann::spatial_hash::SpatialHash;
@@ -33,113 +37,51 @@ struct Vertex {
     colour: [f32; 4],
 }
 
-// [start1, end1] => [start2, end2]
-// [start1 - start1, end1 - start1 ] => [start2, end2]
-// [0, end1 - start1] => [start2, end2]
-// [0, end1 - start1 / end1 - start1 ] => [start2, end2]
-// [0, 1] => [start2, end2]
-// [0, 1 * (end2 - start2) ] => [start2, end2]
-// [start2, end2 - start2 + start2] => [start2, end2]
-fn scale(x: f64, scale1: [f64; 2], scale2: [f64; 2]) -> f64 {
-    let a = (x - scale1[0]) / (scale1[1] - scale1[0]);
-    let b = a * (scale2[1] - scale2[0]);
-    b + scale2[0]
-}
-
-fn grey_to_jet(mut v: f64, min: f64, max: f64) -> (f32, f32, f32)
-{
-    let mut c_r = 1.0;
-    let mut c_g = 1.0;
-    let mut c_b = 1.0;
-
-    if v < min { v = min; }
-    if v > max { v = max; }
-    let dv = max - min;
-
-    if v < (min + 0.25 * dv) {
-      c_r = 0.0;
-      c_g = 4.0 * (v - min) / dv;
-    }
-    else if v < (min + 0.5 * dv) {
-      c_r = 0.0;
-      c_b = 1.0 + 4.0 * (min + 0.25 * dv - v) / dv;
-    }
-    else if v < (min + 0.75 * dv) {
-      c_r = 4.0 * (v - min - 0.5 * dv) / dv;
-      c_b = 0.0;
-    }
-    else {
-      c_g = 1.0 + 4.0 * (min + 0.75 * dv - v) / dv;
-      c_b = 0.0;
-    }
-
-    (c_r as f32, c_g as f32, c_b as f32)
-}
+implement_vertex!(Vertex, position, colour);
 
 
-fn cubic_interpolate( a: f64, b: f64, c: f64, d: f64, w: f64 ) -> f64 {
-
-    let a0 = d - c - a + b;
-    let a1 = a - b - a0;
-    let a2 = c - a;
-    let a3 = b;
-
-   f64::max(0.0, a0*w*w*w + a1*w*w + a2*w + a3)
-}
-
-pub fn linear_interpolate(a: f64, b: f64, w: f64) -> f64 {
-	a * w + b * (1.0 - w)
-}
-
-fn velocity_density(velocities: Vec<f64>, bins: usize) -> Box<Fn(f64) -> f64> {
-    let mut density = vec![0.0; bins];
-    let max_velocity = velocities.iter().cloned().fold(0./0., f64::max);
+fn histogram_1d(data: Vec<f64>, bins: usize) -> (f64, Vec<f64>) {
+    let mut histogram = vec![0.0; bins];
+    let max_data = data.iter().cloned().fold(0./0., f64::max);
     let mut max = 0.0;
 
-    for v in velocities {
-        
-        let i = ( bins as f64 * v / max_velocity ) as usize;
-        density[ std::cmp::min(i, bins-1) ] += 1.0;
-        if density[ std::cmp::min(i, bins-1) ] > max {
-            max = density[ std::cmp::min(i, bins-1) ];
-        }
+    for v in data {
+        let i = scale(v, [0.0, max_data], [0.0, bins as f64 - 1.0]) as usize;
+        histogram[ cmp::max(i, 0) ] += 1.0;
+        max = f64::max( histogram[i], max );
     }
+    
+    (max, histogram)
+} 
 
-    let f = move |x: f64| -> f64 {
-        let i = x as usize;
-        let j = i + 1;
-        let h = if i > 0 {i - 1} else { 0 };
-        let k = i + 2;
-        let a = density[ std::cmp::max(h, 0) ] as f64;
-        let b = density[ std::cmp::min(i, bins-1) ] as f64 ;
-        let c = density[ std::cmp::min(j, bins-1) ] as f64 ;
-        let d = density[ std::cmp::min(k, bins-1) ] as f64 ;
+fn histogram_2d_temp(data: Vec<(Vector, f64)>, max_x: f64, max_y: f64, number_of_rows: usize, number_of_columns: usize) -> (f64, Vec<f64>) {
+    let mut histogram = vec![0.0; number_of_rows*number_of_columns];
+    let mut max = 0.0;
 
-        let v = x - i as f64;
-
-        cubic_interpolate(a, b, c, d, v) / max
-    };
-
-    Box::new(f)
+    for p in data {
+        let r = scale(p.0.y, [0.0, max_y], [0.0, number_of_rows as f64]) as usize;
+        let c = scale(p.0.x, [0.0, max_x], [0.0, number_of_columns as f64]) as usize;
+        
+        histogram[r*number_of_columns + c] += p.1;
+        max = f64::max( histogram[r*number_of_columns + c], max );
+    }
+    
+    (max, histogram)
 }
 
-fn particle_density(positions: Vec<Vector>, width: f64, height: f64, number_of_rows: usize, number_of_columns: usize) -> (Vec<usize>, usize) {
-    let mut bins = vec![0; number_of_rows*number_of_columns];
-    let mut max = 0;
-    
-    let cell_width = width / number_of_columns as f64;
-    let cell_height = height / number_of_rows as f64;
+fn histogram_2d(data: Vec<Vector>, max_x: f64, max_y: f64, number_of_rows: usize, number_of_columns: usize) -> (f64, Vec<f64>) {
+    let mut histogram = vec![0.0; number_of_rows*number_of_columns];
+    let mut max = 0.0;
 
-    for p in positions {
-        let r = (p.y / cell_height) as usize;
-        let c = (p.x / cell_width) as usize;
+    for p in data {
+        let r = scale(p.y, [0.0, max_y], [0.0, number_of_rows as f64]) as usize;
+        let c = scale(p.x, [0.0, max_x], [0.0, number_of_columns as f64]) as usize;
         
-
-        bins[r*number_of_columns + c] += 1;
-        max = cmp::max( bins[r*number_of_columns + c], max );
+        histogram[r*number_of_columns + c] += 1.0;
+        max = f64::max( histogram[r*number_of_columns + c], max );
     }
     
-    (bins, max)
+    (max, histogram)
 }
 
 fn create_window(width: u32, height: u32, x: i32, y: i32, title: &str) -> GlutinFacade {
@@ -182,147 +124,69 @@ fn compile_shaders(display: &GlutinFacade, vertex_shader: &str, fragment_shader:
     None
 }
 
-fn create_buffer(display: &GlutinFacade, number_of_particles: usize) -> (VertexBuffer<Vertex>, NoIndices) {
-        
-    let mut vertices = Vec::new();
 
-    for _ in 0..number_of_particles {
-        vertices.push( Vertex {
-            position: [ 0.0, 0.0 ],
-            colour: [ 1.0, 1.0, 1.0, 1.0 ]
-        } );
-    }    
-    ( VertexBuffer::dynamic(display, &vertices).unwrap(), NoIndices(glium::index::PrimitiveType::Points) )
-}
 
-fn create_plot_buffer(display: &GlutinFacade, number_of_points: usize) -> (VertexBuffer<Vertex>, IndexBuffer<u16>) {
-    let mut vertices = Vec::new();
-    let mut indices = Vec::new();
-    
-    for i in 0..number_of_points {
-        vertices.push( Vertex {
-            position: [ 0.0, 0.0 ],
-            colour: [ 1.0, 1.0, 1.0, 1.0 ]
-        } );
-        indices.push( i as u16 );
-    }
-    ( VertexBuffer::dynamic(display, &vertices).unwrap(), IndexBuffer::new(display, PrimitiveType::LineStrip, &*indices).unwrap() )
+// fn p_x() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.4, 0.6]) }
+// fn p_y() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.4, 0.6]) }
+fn p_x() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.0, 1.0]) }
+fn p_y() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.0, 1.0]) }
+fn v_x() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.2, 0.8]) }
+fn v_y() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.2, 0.8]) }
 
-}
 
-fn display<T: SpatialPartition>(display: &GlutinFacade, program: &Program, simulator: &Simulator<T>, vertex_buffer: &VertexBuffer<Vertex>, index_buffer: &NoIndices) {
-    let params = glium::DrawParameters {
-        blend: glium::Blend::alpha_blending(),
-        .. Default::default()    
-    };
-    
-    let uniforms = uniform! {
-        u_Aspect: simulator.height as f32 / simulator.width as f32,
-        radius: 2.0 * simulator.radius as f32 / simulator.height as f32
-    };
-        
-    let mut target = display.draw();
-    target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
-        
+fn particle_data<T: SpatialPartition>(simulation: &Simulator<T>) -> Vec<(Vector, (f32, f32, f32))> {
+    // let a = simulation.attributes[0].get_vec();
+    // let max = a.iter().cloned().fold(0./0., f64::max);
+
     let mut ps = Vec::new();
-    for p in &simulator.particles {
+    for (i, p) in simulation.particles.iter().enumerate() {
         let position = p.get_position();
         let velocity = p.get_velocity();
         let (red, green, blue) = grey_to_jet(velocity.magnitude(), 0.0, 707.0);
+        // let (red, green, blue) = grey_to_jet(a[i], 0.0, max);
         
-        let x = ( position.x as f32 / ( (simulator.width as f32 / 2.0) ) ) - 1.0;
-        let y = ( position.y as f32 / ( (simulator.height as f32 / 2.0) ) ) - 1.0;
+        // let (red, green, blue) = if i == 0 {
+        //     (1.0, 0.0, 0.0)
+        // }
+        // else {
+        //     (0.0, 0.0, 1.0)
+        // };
         
-        ps.push( Vertex {
-            position: [ x, y ],
-            colour: [ red, green, blue, 1.0 ]
-        } );  
+        // let x = ( position.x as f32 / ( (simulator.width as f32 / 2.0) ) ) - 1.0;
+        // let y = ( position.y as f32 / ( (simulator.height as f32 / 2.0) ) ) - 1.0;
+        // 
+        ps.push( (position, (red, green, blue)) );  
     }        
-                        
-    vertex_buffer.write(&*ps);
-
-    target.draw(vertex_buffer, index_buffer, program, &uniforms, &params).unwrap();    
-    target.finish().unwrap();
-    
+    ps
 }
 
-fn plot<T: SpatialPartition>(display: &GlutinFacade, program: &Program, simulator: &Simulator<T>, vertex_buffer: &VertexBuffer<Vertex>, index_buffer: &IndexBuffer<u16>, number_of_points: usize) {
-    let params = glium::DrawParameters {
-        line_width: Some(2.0),
-        point_size: Some(5.0),
-        blend: glium::Blend::alpha_blending(),
-        .. Default::default()    
-    };
-        
-    let mut target = display.draw();
-    target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
-
-    let number_of_bins = 50;
+fn plotter_data<T: SpatialPartition>(simulation: &Simulator<T>, number_of_data_points: usize) -> (f64, Vec<(f64, f64)>) {    
+    let xs: Vec<f64> = (0..number_of_data_points).map(|n| n as u64 as f64).collect();
+    // let ys: Vec<f64> = (0..number_of_data_points).map(|n| n as u64 as f64).collect();
+    let data = simulation.velocities();
+    let (max, histogram) = histogram_1d(data, 50);
+    let ys = linear_interpolate_vec(&histogram, number_of_data_points);
+    let ds: Vec<(f64, f64)> = xs.into_iter().zip( ys.into_iter() ).collect();
     
-    let vs = velocity_density(simulator.velocities(), number_of_bins);
-    let mut points = Vec::new();
-    for i in 0..number_of_points {
-        let x = scale(i as f64, [0.0, number_of_points as f64-1.0], [-1.0, 1.0]) as f32;
-        let t = vs(scale(i as f64, [0.0, number_of_points as f64-1.0], [0.0, number_of_bins as f64 -1.0]));
-        let y = scale(t, [0.0, 1.0], [-1.0, 0.8]) as f32;
-        
-        points.push( Vertex {
-            position: [ x, y ],
-            colour: [ 0.0, 1.0, 1.0, 1.0 ]
-        } );
-    }
-    vertex_buffer.write(&*points);
-
-    target.draw(vertex_buffer, index_buffer, program, &glium::uniforms::EmptyUniforms, &params).unwrap();
-    target.draw(vertex_buffer, glium::index::NoIndices(glium::index::PrimitiveType::Points), program, &glium::uniforms::EmptyUniforms, &params).unwrap();
-
-    target.finish().unwrap();        
+    (max, ds)
 }
 
-
-fn density<T: SpatialPartition>(display: &GlutinFacade, program: &Program, simulator: &Simulator<T>, vertex_buffer: &VertexBuffer<Vertex>, number_of_rows: usize, number_of_columns: usize) {
+fn density_data( data: Vec<f64>, max: f64 ) -> Vec<(f32, f32, f32)> {
+    let mut new = Vec::new();
     
-    let params = glium::DrawParameters {
-        // point_size: Some(5.0),
-        blend: glium::Blend::alpha_blending(),
-        .. Default::default()    
-    };
-    
-    let radius = 1.0 * (simulator.width / number_of_columns as f64 - 1.0) as f32 / simulator.height as f32;
-    
-    let uniforms = uniform! {
-        u_Aspect: simulator.height as f32 / simulator.width as f32,
-        radius: radius
-    };
-    let mut target = display.draw();
-    target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
-
-    
-    let (bins, max) = particle_density(simulator.positions(), simulator.width, simulator.height, number_of_rows, number_of_columns);
-    let mut points = Vec::new();
-    for i in 0..number_of_columns*number_of_rows {
-        let r = i / number_of_columns;
-        let c = i % number_of_columns;
-            
-        let x = scale(c as f64, [0.0, number_of_columns as f64-1.0], [-1.0 + radius as f64, 1.0 - radius as f64]) as f32;
-        let y = scale(r as f64, [0.0, number_of_rows as f64-1.0], [-1.0 + radius as f64, 1.0 - radius as f64]) as f32;
-
-        let (r, g, b) = grey_to_jet(bins[i] as f64, 0.0, max as f64);            
-        points.push( Vertex {
-            position: [ x, y ],
-            colour: [ r, g, b, 1.0 ]
-        } );
+    for d in data {
+        new.push( grey_to_jet(d, 0.0, max) );
     }
-    vertex_buffer.write(&*points);
+    
+    new
+}
 
-    target.draw(vertex_buffer, glium::index::NoIndices(glium::index::PrimitiveType::Points), program, &uniforms, &params).unwrap();
-
-    target.finish().unwrap();        
+fn histogram_data<T: SpatialPartition>(simulation: &Simulator<T>) -> Vec<(Vector, f64)> {
+    let ds: Vec<(Vector, f64)> = simulation.positions().into_iter().zip( simulation.attributes[0].get_vec().clone().into_iter() ).collect();
+    ds
 }
 
 fn main() {
-    implement_vertex!(Vertex, position, colour);
-    
     let config = read_config("simulation_config.toml");
     
     // define simulation constants
@@ -336,56 +200,55 @@ fn main() {
     let height = config.height.unwrap();
     let density_number_of_rows = config.density_number_of_rows.unwrap();
     let density_number_of_columns = config.density_number_of_columns.unwrap();
-
-    // create windows 
+    
     let simulator_display = create_window(width, height, 664, 50, "boltzmann");
     let density_display = create_window(width, height, 152, 50, "density");
     let plotter_display = create_window(width, height/3, 664, 586, "plot");
-    
-    // compile shaders 
-    let simulator_program = compile_shaders(&simulator_display, "shader/vertex.glsl", 
-                                            "shader/fragment.glsl", Some("shader/geometry.glsl"));
-    let plotter_program = compile_shaders(&plotter_display, "shader/plotter_vertex.glsl", 
-                                          "shader/plotter_fragment.glsl", None);
-    let density_program = compile_shaders(&density_display, "shader/density_vertex.glsl", 
-                                            "shader/density_fragment.glsl", Some("shader/density_geometry.glsl"));
-    
-    
-    if let (Some(s), Some(p), Some(d)) = (simulator_program, plotter_program, density_program) {
-        
-        // create buffers 
-        let (particle_vertex_buffer, particle_index_buffer) = create_buffer(&simulator_display, number_of_particles);
-        let (plotter_vertex_buffer, plotter_index_buffer) = create_plot_buffer(&plotter_display, number_of_data_points);
-        let (density_vertex_buffer, _) = create_buffer(&density_display, density_number_of_rows * density_number_of_columns);
-        
-        
-        if let Some(spatial_hash) = config.spatial_hash {
-            
-            // use spatial hashing 
-            let hash = SpatialHash::new(width as f64, height as f64, spatial_hash.number_of_columns.unwrap(), spatial_hash.number_of_rows.unwrap(), radius).unwrap();
-            let mut simulator = Simulator::new(hash, number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
-            
-            // run simulation 
-            loop {
-                simulator.update();
-                display(&simulator_display, &s, &simulator, &particle_vertex_buffer, &particle_index_buffer);
-                plot(&plotter_display, &p, &simulator, &plotter_vertex_buffer, &plotter_index_buffer, number_of_data_points);
-                density(&density_display, &d, &simulator, &density_vertex_buffer, density_number_of_rows, density_number_of_columns);
-            }
-        }
-        else {
-            
-            // use quadtree
-            let quad = Quadtree::new(width as f64, height as f64, radius);
-            let mut simulator = Simulator::new(quad, number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
 
-            // run simulation 
-            loop {
-                simulator.update();
-                display(&simulator_display, &s, &simulator, &particle_vertex_buffer, &particle_index_buffer);
-                plot(&plotter_display, &p, &simulator, &plotter_vertex_buffer, &plotter_index_buffer, number_of_data_points);
-                density(&density_display, &d, &simulator, &density_vertex_buffer, density_number_of_rows, density_number_of_columns);
-            }
-        };
+    let simulator_program = compile_shaders(&simulator_display, "shader/vertex.glsl", "shader/fragment.glsl", Some("shader/geometry.glsl")).unwrap();
+    let density_program = compile_shaders(&density_display, "shader/density_vertex.glsl", "shader/density_fragment.glsl", Some("shader/density_geometry.glsl")).unwrap();
+    let plotter_program = compile_shaders(&plotter_display, "shader/plotter_vertex.glsl", "shader/plotter_fragment.glsl", None).unwrap();      
+            
+            
+    let quad = Quadtree::new(width as f64, height as f64, radius);
+    let hash = SpatialHash::new(width as f64, height as f64, 250, 250, radius).unwrap();
+    let mut simulator = Simulator::new(hash, (&p_x, &p_y), (&v_x, &v_y), number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
+    
+    let mut t = vec![0.0; number_of_particles];
+    t[0] = 1000.0;
+    let v = Temperature::new(t);
+    
+    simulator.bind_attribute(Box::new(v), true);
+
+    simulator.update();
+    
+    let (max, data) = plotter_data(&simulator, number_of_data_points);
+    
+    
+    let histogra_2d = histogram_2d(simulator.positions(), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
+    // let histogram_2d = histogram_2d_temp(histogram_data(&simulator), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
+    let mut particles = Particles::new((simulator_display, simulator_program), particle_data(&simulator), radius, width as f64, height as f64);
+    let mut plotter = Plotter::new((plotter_display, plotter_program), data, 2.0, 5.0)
+                      .y_range((0.0, max));
+    let mut density = Density::new((density_display, density_program), density_data(histogra_2d.1, histogra_2d.0 ), density_number_of_rows, density_number_of_columns);
+    
+
+    // run simulation 
+    loop {
+        simulator.update();
+        // simulator.update();
+        // simulator.update();
+        // simulator.update();
+        particles.draw();
+        particles.update(particle_data(&simulator));
+        // plotter.plot();
+        // let (max, data) = plotter_data(&simulator, number_of_data_points);
+        // plotter.update( data );
+        // plotter = plotter.y_range((0.0, max));
+        // density.draw();
+        // let histogra_2d = histogram_2d(simulator.positions(), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
+        // let histogram_2d = histogram_2d(simulator.positions(), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
+        // density.update( density_data(histogra_2d.1, histogra_2d.0 ) )
     }
 }
+                                                                           

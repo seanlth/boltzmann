@@ -296,31 +296,64 @@ fn test_collisions_10x10() {
 }
 
 #[test]
-fn test_collisions_2048x1536() {
-    let mut quadtree = Quadtree::new(2048.0, 1536.0, 20.0);
+fn test_collisions_512x512() {
+    let mut quadtree = Quadtree::new(512.0, 512.0, 2.0);
 
     let mut particles = Vec::new();
     
-    for i in 0..100 {
-        let x = rand::random::<f64>() * 2048.0;
-        let y = rand::random::<f64>() * 1536.0;
+    for i in 0..10000 {
+        let x = rand::random::<f64>() * 512.0;
+        let y = rand::random::<f64>() * 512.0;
         let p = Vector::new(x, y);
         particles.push( p );
 
         quadtree.insert( i, p );
     }
     let (c_o, c_m) = quadtree.collision_check_with_comparisons();
+    println!("{}", c_m.len());
     
-    let (c_n_o, c_n_m) = collision_check(20.0, &particles);
+    let (c_n_o, c_n_m) = collision_check(2.0, &particles);
     
     let mut v1 = collision_pairs(c_o);
     let mut v2 = collision_pairs(c_n_o);
     v1.sort();
     v2.sort();
     
-    print(&v1);
-    println!("");
-    print(&v2);
+    // print(&v1);
+    // println!("");
+    // print(&v2);
+    
+    let e = equal_sets(v1, v2);
+    
+    assert_eq!(e, true)
+}
+
+#[test]
+fn test_collisions_parallel_512x512() {
+    let mut quadtree = Quadtree::new(512.0, 512.0, 2.0);
+
+    let mut particles = Vec::new();
+    
+    for i in 0..10000 {
+        let x = rand::random::<f64>() * 512.0;
+        let y = rand::random::<f64>() * 512.0;
+        let p = Vector::new(x, y);
+        particles.push( p );
+
+        quadtree.insert( i, p );
+    }
+    let c_o = quadtree.collision_check_parallel();
+    
+    let (c_n_o, _) = collision_check(2.0, &particles);
+    
+    let mut v1 = collision_pairs(c_o);
+    let mut v2 = collision_pairs(c_n_o);
+    v1.sort();
+    v2.sort();
+    
+    // print(&v1);
+    // println!("");
+    // print(&v2);
     
     let e = equal_sets(v1, v2);
     

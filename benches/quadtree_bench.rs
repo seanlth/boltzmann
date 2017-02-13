@@ -18,15 +18,29 @@ mod tests {
 
     #[bench]
     fn bench_quadtree(b: &mut Bencher) {
-        let mut quadtree = Quadtree::new(2048.0, 1536.0, 5.0);
+        let mut quadtree = Quadtree::new(512.0, 512.0, 2.0);
                 
         for i in 0..10000 {
-            let x = rand::random::<f64>() * 2048.0;
-            let y = rand::random::<f64>() * 1536.0;
+            let x = rand::random::<f64>() * 512.0;
+            let y = rand::random::<f64>() * 512.0;
             let p = Vector::new(x, y);
             quadtree.insert( i, p );
         }
         
         b.iter(|| quadtree.collision_check() );
+    }
+    
+    #[bench]
+    fn bench_quadtree_parallel(b: &mut Bencher) {
+        let mut quadtree = Quadtree::new(512.0, 512.0, 2.0);
+                
+        for i in 0..10000 {
+            let x = rand::random::<f64>() * 512.0;
+            let y = rand::random::<f64>() * 512.0;
+            let p = Vector::new(x, y);
+            quadtree.insert( i, p );
+        }
+        
+        b.iter(|| quadtree.collision_check_parallel() );
     }
 }

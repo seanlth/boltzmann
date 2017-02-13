@@ -7,18 +7,7 @@
 
 extern crate toml;
 
-use std::io::prelude::*;
-use std::fs::File;
-
-pub fn read_file(file_name: &str) -> Option<String> {
-    let mut r = None;
-    if let Ok(mut f) = File::open(file_name) {
-        let mut s = String::new();
-        let _ = f.read_to_string(&mut s);
-        r = Some(s)
-    }
-    r
-}
+use common::read_file;
 
 /// This is what we're going to decode into. Each field is optional, meaning
 /// that it doesn't have to be present in TOML.

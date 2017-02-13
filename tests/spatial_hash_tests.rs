@@ -112,7 +112,7 @@ fn collision_pairs2(comparisons: Vec<(usize, usize)>) -> Vec<P> {
 
 #[test]
 fn test_collisions_2x2_non_random() {
-    let mut spatial_hash = SpatialHash::new(10.0, 10.0, 2, 2, 2.0);
+    let mut spatial_hash = SpatialHash::new(10.0, 10.0, 2, 2, 1.0).unwrap();
     
     let mut particles = Vec::new();
     
@@ -184,7 +184,7 @@ fn test_collisions_2x2_non_random() {
     
     let (c_o, c_m) = spatial_hash.collision_check_with_comparisons();
     
-    let (c_n_o, c_n_m) = collision_check(2.0, &particles);
+    let (c_n_o, c_n_m) = collision_check(1.0, &particles);
     
     let mut v1 = collision_pairs(c_o);
     let mut v2 = collision_pairs(c_n_o);
@@ -202,7 +202,7 @@ fn test_collisions_2x2_non_random() {
 
 #[test]
 fn test_collisions_2x2() {
-    let mut spatial_hash = SpatialHash::new(10.0, 10.0, 2, 2, 2.0);
+    let mut spatial_hash = SpatialHash::new(10.0, 10.0, 2, 2, 1.0).unwrap();
     
     let mut particles = Vec::new();
     
@@ -216,7 +216,7 @@ fn test_collisions_2x2() {
     }
     let (c_o, c_m) = spatial_hash.collision_check_with_comparisons();
     
-    let (c_n_o, c_n_m) = collision_check(2.0, &particles);
+    let (c_n_o, c_n_m) = collision_check(1.0, &particles);
     
     let mut v1 = collision_pairs(c_o);
     let mut v2 = collision_pairs(c_n_o);
@@ -233,7 +233,7 @@ fn test_collisions_2x2() {
 
 #[test]
 fn test_collisions_3x3() {
-    let mut spatial_hash = SpatialHash::new(30.0, 30.0, 3, 3, 2.0);
+    let mut spatial_hash = SpatialHash::new(30.0, 30.0, 3, 3, 1.0).unwrap();
     
     let mut particles = Vec::new();
     
@@ -247,7 +247,7 @@ fn test_collisions_3x3() {
     }
     let (c_o, c_m) = spatial_hash.collision_check_with_comparisons();
     
-    let (c_n_o, c_n_m) = collision_check(2.0, &particles);
+    let (c_n_o, c_n_m) = collision_check(1.0, &particles);
     
     let mut v1 = collision_pairs(c_o);
     let mut v2 = collision_pairs(c_n_o);
@@ -265,7 +265,7 @@ fn test_collisions_3x3() {
 
 #[test]
 fn test_collisions_10x10() {
-    let mut spatial_hash = SpatialHash::new(100.0, 100.0, 10, 10, 2.0);
+    let mut spatial_hash = SpatialHash::new(100.0, 100.0, 10, 10, 2.0).unwrap();
     
     let mut particles = Vec::new();
     
@@ -296,14 +296,14 @@ fn test_collisions_10x10() {
 }
 
 #[test]
-fn test_collisions_2048x1536() {
-    let mut spatial_hash = SpatialHash::new(2048.0, 1536.0, 10, 10, 20.0);
+fn test_collisions_512x512() {
+    let mut spatial_hash = SpatialHash::new(512.0, 512.0, 32, 32, 2.0).unwrap();
     
     let mut particles = Vec::new();
     
     for i in 0..10000 {
-        let x = rand::random::<f64>() * 2048.0;
-        let y = rand::random::<f64>() * 1536.0;
+        let x = rand::random::<f64>() * 512.0;
+        let y = rand::random::<f64>() * 512.0;
         let p = Vector::new(x, y);
         particles.push( p );
 
@@ -311,17 +311,43 @@ fn test_collisions_2048x1536() {
     }
     let (c_o, c_m) = spatial_hash.collision_check_with_comparisons();
     
-    let (c_n_o, c_n_m) = collision_check(20.0, &particles);
+    println!("{}", c_m.len());
+    
+    let (c_n_o, c_n_m) = collision_check(2.0, &particles);
     
     let mut v1 = collision_pairs(c_o);
     let mut v2 = collision_pairs(c_n_o);
     v1.sort();
     v2.sort();
+        
+    let e = equal_sets(v1, v2);
     
-    print(&v1);
-    println!("");
-    print(&v2);
+    assert_eq!(e, true)
+}
+
+#[test]
+fn test_collisions_parallel_512x512() {
+    let mut spatial_hash = SpatialHash::new(512.0, 512.0, 32, 32, 2.0).unwrap();
     
+    let mut particles = Vec::new();
+    
+    for i in 0..10000 {
+        let x = rand::random::<f64>() * 512.0;
+        let y = rand::random::<f64>() * 512.0;
+        let p = Vector::new(x, y);
+        particles.push( p );
+
+        spatial_hash.insert( i, p );
+    }
+    let c_o = spatial_hash.collision_check_parallel();
+        
+    let (c_n_o, _) = collision_check(2.0, &particles);
+    
+    let mut v1 = collision_pairs(c_o);
+    let mut v2 = collision_pairs(c_n_o);
+    v1.sort();
+    v2.sort();
+        
     let e = equal_sets(v1, v2);
     
     assert_eq!(e, true)

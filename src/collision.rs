@@ -3,13 +3,16 @@ use particle::Particle;
 
 use std::cmp::Ordering;
 
-
+#[derive(Copy, Clone)]
 pub struct Collision {
     pub p1: usize,
     pub p2: usize,
     pub penetration: f64,
     pub normal: Vector
 }
+
+unsafe impl Sync for Collision {}
+unsafe impl Send for Collision {}
 
 impl Collision {
     pub fn new(p1: usize, p2: usize, penetration: f64, normal: Vector) -> Collision {
@@ -55,8 +58,9 @@ impl PartialOrd for Collision {
 pub trait SpatialPartition {
     fn insert(&mut self, index: usize, position: Vector);
     fn clear(&mut self);
-    fn collision_check(&self) -> Vec<Collision>;
-    fn collision_check_with_comparisons(&self) -> (Vec<Collision>, Vec<(usize, usize)>);
+    fn collision_check(&mut self) -> &Vec<Collision>;
+    fn collision_check_parallel(&mut self) -> &Vec<Collision>;
+    fn collision_check_with_comparisons(&mut self) -> (&Vec<Collision>, Vec<(usize, usize)>);
 }
 
 
