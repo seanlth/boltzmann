@@ -2,12 +2,7 @@
 use vector::*;
 use particle::Particle;
 use collision::*;
-use spatial_hash::SpatialHash;
-use quadtree::Quadtree;
 use attribute::Attribute;
-use std::any::Any;
-
-use rand;
 
 pub type Probability = Fn() -> f64;
 
@@ -20,8 +15,10 @@ pub struct Simulator<T: SpatialPartition> {
     pub width: f64,
     pub height: f64,
     pub dt: f64,
-    pub attributes: Vec<Box<Attribute>>,
-    // pub collision_attributes: Vec<Box<Attribute>>
+    attributes: Vec<Box<Attribute>>,
+    normal_attributes: Vec<usize>,
+    collision_attributes: Vec<usize>,
+    attribute_id_count: usize,
 }
 
 #[allow(dead_code)]
@@ -40,7 +37,10 @@ impl<T: SpatialPartition> Simulator<T> {
             width: width,
             height: height,
             dt: dt,
-            attributes: vec![]
+            attributes: vec![],
+            normal_attributes: vec![],
+            collision_attributes: vec![],
+            attribute_id_count: 0
         };
         s.initial_conditions(initial_posiiton, initial_velocity, number_of_particles, width, height, dt);
         s
@@ -66,12 +66,26 @@ impl<T: SpatialPartition> Simulator<T> {
         }
     }
     
-    pub fn bind_attribute(&mut self, attribute: Box<Attribute>, collision_listener: bool) {
-        match collision_listener {
-            true => self.attributes.push(attribute),
-            false => self.attributes.push(attribute)
+    pub fn bind_attribute<A: 'static + Attribute>(&mut self) -> usize {
+        let mut attribute = Box::new( A::new() );
+        attribute.initialise( vec![0.0; self.particles.len()] );
+        let id = self.attribute_id_count;
+        match attribute.collision_listener() {
+            true => self.collision_attributes.push(id),
+            false => self.normal_attributes.push(id)
         }
-    } 
+        self.attributes.push(attribute);
+        self.attribute_id_count += 1;
+        id
+    }
+    
+    pub fn attribute(&self, id: usize) -> &Box<Attribute> {
+        &self.attributes[id]
+    }
+    
+    pub fn set_attribute(&mut self, id: usize, f: f64, i: f64) {
+        self.attributes[id].set(f, i);
+    }
 
     pub fn insert_particle(&mut self, p: Vector, v: Vector) {
         self.particles.push( Particle::new(p, v, self.dt) );
@@ -134,13 +148,14 @@ impl<T: SpatialPartition> Simulator<T> {
     // solves collisions by applying impulse and adjusting particle locations
     fn solve_collisions(&mut self) {
         let collisions = self.spatial_partition.collision_check_parallel();
-        // let collisions = self.naive_collision_check();
 
         for c in collisions {
             
             // update attributes 
-            self.attributes[0].collision_update(c.p1, c.p2);
-            
+            for a in &self.collision_attributes { 
+                self.attributes[*a].collision_update(c.p1, c.p2, &self.particles[c.p1], &self.particles[c.p2]);
+            }
+                    
             let p = self.particles[c.p1];
             let q = self.particles[c.p2];
             let normal = c.normal;
@@ -203,7 +218,11 @@ impl<T: SpatialPartition> Simulator<T> {
         for (i, mut p) in &mut self.particles.iter_mut().enumerate() {
             p.verlet( Vector::new(0.0, self.gravity) );
             Self::boundary_check(p, self.radius, self.restitution, self.width, self.height);
-            self.spatial_partition.insert(i, p.get_position())
+            self.spatial_partition.insert(i, p.get_position());
+            
+            for a in &self.normal_attributes {
+                self.attributes[*a].update(i, &p);
+            }
         }
     }
 

@@ -11,9 +11,6 @@ pub struct Collision {
     pub normal: Vector
 }
 
-unsafe impl Sync for Collision {}
-unsafe impl Send for Collision {}
-
 impl Collision {
     pub fn new(p1: usize, p2: usize, penetration: f64, normal: Vector) -> Collision {
         

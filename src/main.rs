@@ -5,18 +5,11 @@ extern crate boltzmann;
 extern crate rand;
 
 use std::cmp;
-use std::ops::Index;
 
 use glium::glutin;
 use glium::DisplayBuild;
 use glium::Program;
 use glium::backend::glutin_backend::GlutinFacade;
-use glium::VertexBuffer;
-use glium::IndexBuffer;
-use glium::index::NoIndices;
-use glium::Surface;
-use glium::index::PrimitiveType;
-
 
 use boltzmann::simulator::Simulator;
 use boltzmann::collision::SpatialPartition;
@@ -124,10 +117,6 @@ fn compile_shaders(display: &GlutinFacade, vertex_shader: &str, fragment_shader:
     None
 }
 
-
-
-// fn p_x() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.4, 0.6]) }
-// fn p_y() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.4, 0.6]) }
 fn p_x() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.0, 1.0]) }
 fn p_y() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.0, 1.0]) }
 fn v_x() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.2, 0.8]) }
@@ -135,26 +124,13 @@ fn v_y() -> f64 { scale(rand::random::<f64>(), [0.0, 1.0], [0.2, 0.8]) }
 
 
 fn particle_data<T: SpatialPartition>(simulation: &Simulator<T>) -> Vec<(Vector, (f32, f32, f32))> {
-    // let a = simulation.attributes[0].get_vec();
-    // let max = a.iter().cloned().fold(0./0., f64::max);
+    let a = simulation.attribute(0).get_data();
+    let (min, max) = simulation.attribute(0).data_bounds();
 
     let mut ps = Vec::new();
     for (i, p) in simulation.particles.iter().enumerate() {
         let position = p.get_position();
-        let velocity = p.get_velocity();
-        let (red, green, blue) = grey_to_jet(velocity.magnitude(), 0.0, 707.0);
-        // let (red, green, blue) = grey_to_jet(a[i], 0.0, max);
-        
-        // let (red, green, blue) = if i == 0 {
-        //     (1.0, 0.0, 0.0)
-        // }
-        // else {
-        //     (0.0, 0.0, 1.0)
-        // };
-        
-        // let x = ( position.x as f32 / ( (simulator.width as f32 / 2.0) ) ) - 1.0;
-        // let y = ( position.y as f32 / ( (simulator.height as f32 / 2.0) ) ) - 1.0;
-        // 
+        let (red, green, blue) = grey_to_jet(a[i], min, max);
         ps.push( (position, (red, green, blue)) );  
     }        
     ps
@@ -162,7 +138,6 @@ fn particle_data<T: SpatialPartition>(simulation: &Simulator<T>) -> Vec<(Vector,
 
 fn plotter_data<T: SpatialPartition>(simulation: &Simulator<T>, number_of_data_points: usize) -> (f64, Vec<(f64, f64)>) {    
     let xs: Vec<f64> = (0..number_of_data_points).map(|n| n as u64 as f64).collect();
-    // let ys: Vec<f64> = (0..number_of_data_points).map(|n| n as u64 as f64).collect();
     let data = simulation.velocities();
     let (max, histogram) = histogram_1d(data, 50);
     let ys = linear_interpolate_vec(&histogram, number_of_data_points);
@@ -182,7 +157,7 @@ fn density_data( data: Vec<f64>, max: f64 ) -> Vec<(f32, f32, f32)> {
 }
 
 fn histogram_data<T: SpatialPartition>(simulation: &Simulator<T>) -> Vec<(Vector, f64)> {
-    let ds: Vec<(Vector, f64)> = simulation.positions().into_iter().zip( simulation.attributes[0].get_vec().clone().into_iter() ).collect();
+    let ds: Vec<(Vector, f64)> = simulation.positions().into_iter().zip( simulation.attribute(0).get_data().clone().into_iter() ).collect();
     ds
 }
 
@@ -214,11 +189,10 @@ fn main() {
     let hash = SpatialHash::new(width as f64, height as f64, 250, 250, radius).unwrap();
     let mut simulator = Simulator::new(hash, (&p_x, &p_y), (&v_x, &v_y), number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
     
-    let mut t = vec![0.0; number_of_particles];
-    t[0] = 1000.0;
-    let v = Temperature::new(t);
-    
-    simulator.bind_attribute(Box::new(v), true);
+    // let mut v = boltzmann::attribute::Density::new();
+    // let v = boltzmann::attribute::Speed::new();
+    simulator.bind_attribute::<Visted>();
+    simulator.set_attribute(0, 1.0, 0.0);
 
     simulator.update();
     
@@ -230,15 +204,19 @@ fn main() {
     let mut particles = Particles::new((simulator_display, simulator_program), particle_data(&simulator), radius, width as f64, height as f64);
     let mut plotter = Plotter::new((plotter_display, plotter_program), data, 2.0, 5.0)
                       .y_range((0.0, max));
-    let mut density = Density::new((density_display, density_program), density_data(histogra_2d.1, histogra_2d.0 ), density_number_of_rows, density_number_of_columns);
+    let mut density = boltzmann::drawing::Density::new((density_display, density_program), density_data(histogra_2d.1, histogra_2d.0 ), density_number_of_rows, density_number_of_columns);
     
 
     // run simulation 
     loop {
         simulator.update();
-        // simulator.update();
-        // simulator.update();
-        // simulator.update();
+        simulator.update();
+        simulator.update();
+        simulator.update();
+        simulator.update();
+        simulator.update();
+        simulator.update();
+
         particles.draw();
         particles.update(particle_data(&simulator));
         // plotter.plot();
