@@ -76,21 +76,33 @@ macro_rules! impl_attribute {
     };
 }
 
-impl_collision_attribute! { Virus, self, i, j, p1, p2, 0.0, 1.0,
+impl_collision_attribute! { virus_attr, self, i, j, p1, p2, 0.0, 1.0,
     {
-        self.t[i] = self.t[i].max(self.t[j]);
-        self.t[j] = self.t[j].max(self.t[i]);  
+        let max = self.t[i].max(self.t[j]);
+        
+        if self.t[i] == 1.0 && self.t[j] == 0.0 {
+            self.t[j] = 0.5;
+        }
+        else if self.t[i] == 1.0 && self.t[j] == 0.5 {
+            self.t[j] = 1.0;
+        }
+        else if self.t[j] == 1.0 && self.t[i] == 0.0 {
+            self.t[i] = 0.5;
+        }
+        else if self.t[j] == 1.0 && self.t[i] == 0.5 {
+            self.t[i] = 1.0;
+        }
     }
 }
 
-impl_collision_attribute! { Density, self, i, j, p1, p2, 0.0, 1.0,
+impl_collision_attribute! { density_attr, self, i, j, p1, p2,
     {
         let sum = ( self.t[i] + self.t[j] ) / 2.0;
         self.t[i] = sum; self.t[j] = sum;
     }
 }
 
-impl_collision_attribute! { Tag, self, i, j, p1, p2, 0.0, 1.0,
+impl_collision_attribute! { tag_attr, self, i, j, p1, p2, 0.0, 1.0,
     {
         let t = self.t[i];
         self.t[i] = self.t[j];
@@ -98,7 +110,7 @@ impl_collision_attribute! { Tag, self, i, j, p1, p2, 0.0, 1.0,
     }
 }
 
-impl_collision_attribute! { Visted, self, i, j, p1, p2, 0.0, 1.0, 
+impl_collision_attribute! { visted_attr, self, i, j, p1, p2, 0.0, 1.0, 
     {
         let t1 = self.t[i];
         let t2 = self.t[j];
@@ -107,7 +119,7 @@ impl_collision_attribute! { Visted, self, i, j, p1, p2, 0.0, 1.0,
     }
 }
 
-impl_collision_attribute! { Range, self, i, j, p1, p2, 0.0, 1.0,
+impl_collision_attribute! { range_attr, self, i, j, p1, p2, 0.0, 1.0,
     {
         let t1 = self.t[i];
         let t2 = self.t[j];
@@ -116,7 +128,7 @@ impl_collision_attribute! { Range, self, i, j, p1, p2, 0.0, 1.0,
     }
 }
 
-impl_attribute! { Speed, self, i, p,
+impl_attribute! { speed_attr, self, i, p,
     {
         self.t[i] = p.get_velocity().magnitude();
     }

@@ -186,12 +186,10 @@ fn main() {
             
             
     let quad = Quadtree::new(width as f64, height as f64, radius);
-    let hash = SpatialHash::new(width as f64, height as f64, 250, 250, radius).unwrap();
+    let hash = SpatialHash::new(width as f64, height as f64, 32, 32, radius).unwrap();
     let mut simulator = Simulator::new(hash, (&p_x, &p_y), (&v_x, &v_y), number_of_particles, radius, gravity, restitution, width as f64, height as f64, dt);
     
-    // let mut v = boltzmann::attribute::Density::new();
-    // let v = boltzmann::attribute::Speed::new();
-    simulator.bind_attribute::<Visted>();
+    simulator.bind_attribute::<virus_attr>();
     simulator.set_attribute(0, 1.0, 0.0);
 
     simulator.update();
@@ -199,12 +197,12 @@ fn main() {
     let (max, data) = plotter_data(&simulator, number_of_data_points);
     
     
-    let histogra_2d = histogram_2d(simulator.positions(), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
-    // let histogram_2d = histogram_2d_temp(histogram_data(&simulator), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
+    // let histogra_2d = histogram_2d(simulator.positions(), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
+    let histogram_2d = histogram_2d_temp(histogram_data(&simulator), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
     let mut particles = Particles::new((simulator_display, simulator_program), particle_data(&simulator), radius, width as f64, height as f64);
     let mut plotter = Plotter::new((plotter_display, plotter_program), data, 2.0, 5.0)
                       .y_range((0.0, max));
-    let mut density = boltzmann::drawing::Density::new((density_display, density_program), density_data(histogra_2d.1, histogra_2d.0 ), density_number_of_rows, density_number_of_columns);
+    let mut density = boltzmann::drawing::Density::new((density_display, density_program), density_data(histogram_2d.1, histogram_2d.0 ), density_number_of_rows, density_number_of_columns);
     
 
     // run simulation 
@@ -219,14 +217,14 @@ fn main() {
 
         particles.draw();
         particles.update(particle_data(&simulator));
-        // plotter.plot();
-        // let (max, data) = plotter_data(&simulator, number_of_data_points);
-        // plotter.update( data );
-        // plotter = plotter.y_range((0.0, max));
-        // density.draw();
-        // let histogra_2d = histogram_2d(simulator.positions(), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
+        plotter.plot();
+        let (max, data) = plotter_data(&simulator, number_of_data_points);
+        plotter.update( data );
+        plotter = plotter.y_range((0.0, max));
+        density.draw();
+        let histogram_2d = histogram_2d_temp(histogram_data(&simulator), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
         // let histogram_2d = histogram_2d(simulator.positions(), width as f64, height as f64, density_number_of_rows, density_number_of_columns);
-        // density.update( density_data(histogra_2d.1, histogra_2d.0 ) )
+        density.update( density_data(histogram_2d.1, histogram_2d.0 ) )
     }
 }
                                                                            
