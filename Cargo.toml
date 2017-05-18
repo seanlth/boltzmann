@@ -3,6 +3,11 @@ name = "boltzmann"
 version = "0.1.0"
 authors = ["hargados <hargados@tcd.ie>"]
 
+
+[lib]
+name = "boltzmann"
+path = "src/lib.rs"
+
 [dependencies]
 
 rand = "0.3"
@@ -11,3 +16,5 @@ glium = "*"
 toml = "0.2.1"
 rustc-serialize = "0.3.22"
 scoped-pool = "1"
+
+

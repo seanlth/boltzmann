@@ -1,16 +1,10 @@
-//! An example showing off the usage of `RustcDecodable` to automatically decode
-//! TOML into a Rust `struct`
-//!
-//! Note that this works similarly with `serde` as well.
 
-#![deny(warnings)]
+//! Simulation configuration reading.
 
 extern crate toml;
 
 use common::read_file;
 
-/// This is what we're going to decode into. Each field is optional, meaning
-/// that it doesn't have to be present in TOML.
 #[derive(Debug, RustcDecodable)]
 pub struct Config {
     pub number_of_particles: Option<usize>,

@@ -5,6 +5,7 @@ layout (triangle_strip, max_vertices=4) out;
 
 in VertexData {
     vec4 colour;
+	float radius;
 } VertexIn[];
 
 out VertexData {
@@ -13,11 +14,12 @@ out VertexData {
 } VertexOut;
 
 uniform float u_Aspect;
-uniform float radius;
 
 
 void main()
 {
+	float radius = VertexIn[0].radius;
+
     gl_Position = gl_in[0].gl_Position + vec4(-radius*u_Aspect, -radius, 0, 0);
     VertexOut.colour = VertexIn[0].colour;
     VertexOut.uv = vec2(-1, -1);

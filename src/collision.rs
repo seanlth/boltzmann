@@ -1,17 +1,27 @@
+//! Collision data structure and spatial partitioning. 
+
 use vector::Vector;
 use particle::Particle;
-
 use std::cmp::Ordering;
+
+/// <img src="https://seanlth.github.io/boltzmann/images/collision.svg" width="300px"> <br>
+/// Represents a collision between 2 particles. 
+/// The id of p1 is always less than or equal to p2.
 
 #[derive(Copy, Clone)]
 pub struct Collision {
+    /// id of particle 1.
     pub p1: usize,
+    /// id of particle 2.
     pub p2: usize,
+    /// Amount by which the particles are overlapping.
     pub penetration: f64,
+    /// Vector of the collision normal.
     pub normal: Vector
 }
 
 impl Collision {
+    /// Make a new collision.
     pub fn new(p1: usize, p2: usize, penetration: f64, normal: Vector) -> Collision {
         
         let (i, j) = if p2 < p1 { (p2, p1) }
@@ -35,14 +45,14 @@ impl PartialEq for Collision {
 impl Eq for Collision {} 
 
 impl Ord for Collision {
+    
+    // (p1, p2) ~ (p1, p2)
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.p1 < other.p1 { Ordering::Less }
+        if self.p1 < other.p1 { Ordering::Less } 
         else if self.p1 > other.p1 { Ordering::Greater }
-        else {
-            if self.p2 < other.p2 { Ordering::Less }
-            else if self.p2 > other.p2 { Ordering::Greater }
-            else { Ordering::Equal }
-        }
+        else if self.p2 < other.p2 { Ordering::Less }
+        else if self.p2 > other.p2 { Ordering::Greater }
+        else { Ordering::Equal }
     }
 }
 
@@ -52,24 +62,33 @@ impl PartialOrd for Collision {
     }
 }
 
+/// Represents a spatial partitioning data structure
+/// for accelerating collision checks.
+
 pub trait SpatialPartition {
-    fn insert(&mut self, index: usize, position: Vector);
+    /// Add a particle to the structure.
+    fn insert(&mut self, index: usize, position: Vector, radius: f64);
+    /// Clear all particles from the structure.
     fn clear(&mut self);
+    /// Check for collisions.
     fn collision_check(&mut self) -> &Vec<Collision>;
+    /// Check for collisions in a multithreaded fashion if possible.
     fn collision_check_parallel(&mut self) -> &Vec<Collision>;
+    /// Check for collisions and also what pairs of particles were 
+    /// compared in the process. 
     fn collision_check_with_comparisons(&mut self) -> (&Vec<Collision>, Vec<(usize, usize)>);
 }
 
 
-fn naive_collision_check(radius: f64, particles: &Vec<Particle>) -> Vec<Collision> {
+/// Check for collisions in a naive O(n^2 ) fashion.
+
+pub fn naive_collision_check(radius: f64, particles: &[Particle]) -> Vec<Collision> {
     let mut collisions = Vec::new();
 
-    for i in 0..particles.len() {
-        let p = particles[i];
+    for (i, p) in particles.iter().enumerate() {
         let p_position = p.get_position();
 
-        for j in (i+1)..particles.len() {
-            let q = particles[j];
+        for (j, q) in particles.iter().enumerate().skip((i+1)) {
             let q_position = q.get_position();
 
             let normal = (q_position - p_position).normalise();

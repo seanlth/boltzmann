@@ -1,7 +1,9 @@
+//! Quadtree spatial partitioning.
+
 use collision::*;
 use vector::Vector;
 
-use scoped_pool::{Pool, Scope};
+use scoped_pool::Pool;
 
 
 pub struct Quadtree {
@@ -81,9 +83,11 @@ impl Quadtree {
 
         self.children = Some((c1, c2, c3, c4));
 
+        let r = self.radius;
+
         let temp = self.objects.clone();
         self.objects.clear();
-        for (i, p) in temp { self.insert(i, p); }
+        for (i, p) in temp { self.insert(i, p, r); }
     }
 
     pub fn print(&self) {
@@ -136,13 +140,13 @@ impl SpatialPartition for Quadtree {
 
     // add object to quadtee at current level
     // will get added to children if valid
-    fn insert(&mut self, index: usize, p: Vector) {
+    fn insert(&mut self, index: usize, p: Vector, radius: f64) {
         self.empty = false;
         if let Some((ref mut c1, ref mut c2, ref mut c3, ref mut c4)) = self.children {
-            if c1.within(p) { c1.insert(index, p); }
-            if c2.within(p) { c2.insert(index, p); }
-            if c3.within(p) { c3.insert(index, p); }
-            if c4.within(p) { c4.insert(index, p); }
+            if c1.within(p) { c1.insert(index, p, radius); }
+            if c2.within(p) { c2.insert(index, p, radius); }
+            if c3.within(p) { c3.insert(index, p, radius); }
+            if c4.within(p) { c4.insert(index, p, radius); }
         }
         else {
             self.objects.push((index, p));

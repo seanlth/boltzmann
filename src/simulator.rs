@@ -1,19 +1,41 @@
+//! Simulator. 
+
+use std::f64;
 
 use vector::*;
 use particle::Particle;
 use collision::*;
 use attribute::Attribute;
+use common::*;
+
+
+/// Probability function. 
 
 pub type Probability = Fn() -> f64;
 
+/// Struct representing the simulation. 
+
 pub struct Simulator<T: SpatialPartition> {
+    /// The spatial partitioning scheme used for
+    /// accelerating collision detection.
     pub spatial_partition: T,
+    /// Number of particles.
+    pub number_of_particles: usize,
+    /// The list of particles.
     pub particles: Vec<Particle>,
-    pub radius: f64,
+    /// Acceleration due to gravity. 
     pub gravity: f64,
-    pub restitution: f64,
+    /// The restitution in a particle-particle collision.
+    pub particle_restitution: f64,
+    /// The restitution in a wall-particle collision.
+    pub wall_restitution: f64,
+    /// Simulation domain width.
     pub width: f64,
+    /// Simulation domain height.
     pub height: f64,
+    /// Maximum allowed speed of a particle.
+    pub max_speed: f64,
+    /// Timestep.
     pub dt: f64,
     attributes: Vec<Box<Attribute>>,
     normal_attributes: Vec<usize>,
@@ -23,49 +45,91 @@ pub struct Simulator<T: SpatialPartition> {
 
 #[allow(dead_code)]
 impl<T: SpatialPartition> Simulator<T> {
-    pub fn new(spatial_partition: T, 
-        initial_posiiton: (&Probability, &Probability), initial_velocity: (&Probability, &Probability), 
-        number_of_particles: usize, radius: f64, gravity: f64, restitution: f64, 
-        width: f64, height: f64, dt: f64) -> Simulator<T> {
+
+    /// Make a simulator. 
+    pub fn new(spatial_partition: T, number_of_particles: usize, 
+        gravity: f64, particle_restitution: f64, wall_restitution: f64, 
+        width: f64, height: f64, max_speed: f64, dt: f64) -> Simulator<T> {
         
-        let mut s = Simulator {
+        Simulator {
             spatial_partition: spatial_partition,
+            number_of_particles: number_of_particles,
             particles: vec![],
-            radius: radius,
             gravity: gravity,
-            restitution: restitution,
+            particle_restitution: particle_restitution,
+            wall_restitution: wall_restitution,
             width: width,
             height: height,
+            max_speed: max_speed,
             dt: dt,
             attributes: vec![],
             normal_attributes: vec![],
             collision_attributes: vec![],
             attribute_id_count: 0
-        };
-        s.initial_conditions(initial_posiiton, initial_velocity, number_of_particles, width, height, dt);
-        s
-    }
-
-    fn initial_conditions(&mut self, initial_posiiton: (&Probability, &Probability), initial_velocity: (&Probability, &Probability), 
-        number_of_particles: usize, width: f64, height: f64, dt: f64) {
-
-        for i in 0..number_of_particles {
-
-            // random positions and velocities
-            let p_x = (initial_posiiton.0() * (width - 2.0*self.radius ) ) - self.radius;
-            let p_y = (initial_posiiton.1() * (height - 2.0*self.radius ) ) - self.radius;
-            let v_x = (initial_velocity.0() * 500.0) - 250.0;
-            let v_y = (initial_velocity.1() * 500.0) - 250.0;
-
-            let position = Vector::new( p_x, height as f64 - p_y );
-            let velocity = Vector::new( v_x, v_y );
-
-            self.particles.push( Particle::new(position, velocity, dt) );
-
-            self.spatial_partition.insert(i, position);
         }
     }
     
+    /// Specify the initial conditions manually. 
+    pub fn initial_conditions(&mut self, 
+                              positions: Vec<Vector>,
+                              velocities: Vec<Vector>,
+                              radii: Vec<f64>) {
+        
+        for i in 0..self.number_of_particles {
+
+            let r = radii[i];
+
+            let p_x = f64::max(0.0, f64::min(self.width - r, positions[i].x) );
+            let p_y = f64::max(0.0, f64::min(self.height - r, positions[i].y) );
+
+            let dir = velocities[i].normalise();
+            let speed = f64::min(self.max_speed, velocities[i].magnitude());
+
+            let v_x = dir.x * speed;
+            let v_y = dir.y * speed;
+
+            let position = Vector::new( p_x, self.height as f64 - p_y );
+            let velocity = Vector::new( v_x, v_y );
+
+            let p = Particle::new(position, velocity, r, self.dt);
+
+            self.particles.push( p );
+
+            self.spatial_partition.insert(i, position, p.radius);
+        }
+
+    }
+
+    /// Specify the initial conditions probabilistically.
+    pub fn probabilistic_initial_conditions(&mut self, 
+                          posiition_distribution: (&Probability, &Probability), 
+                          velocity_distribution: (&Probability, &Probability), 
+                          radii_distribution: &Probability) {
+
+        for i in 0..self.number_of_particles {
+
+            // random positions and velocities
+            let r = radii_distribution();
+            
+            let p_x = scale(posiition_distribution.0(), [0.0, 1.0], [r, self.width as f64 - r]); 
+            let p_y = scale(posiition_distribution.1(), [0.0, 1.0], [r, self.height as f64 - r]); 
+            
+            let angle = scale(velocity_distribution.0(), [0.0, 1.0], [0.0, 2.0*f64::consts::PI]);
+            let dir = Vector::new( f64::cos(angle), f64::sin(angle) ).normalise();
+            let speed = self.max_speed * velocity_distribution.1();
+
+            let position = Vector::new( p_x, self.height as f64 - p_y );
+            let velocity = speed * dir;
+
+            let p = Particle::new(position, velocity, r, self.dt);
+
+            self.particles.push( p );
+
+            self.spatial_partition.insert(i, position, p.radius);
+        }
+    }
+    
+    /// Bind an attribute.
     pub fn bind_attribute<A: 'static + Attribute>(&mut self) -> usize {
         let mut attribute = Box::new( A::new() );
         attribute.initialise( vec![0.0; self.particles.len()] );
@@ -79,18 +143,23 @@ impl<T: SpatialPartition> Simulator<T> {
         id
     }
     
+    /// Get an an attribute.
     pub fn attribute(&self, id: usize) -> &Box<Attribute> {
         &self.attributes[id]
     }
     
+    /// Set a value for the attribute.
     pub fn set_attribute(&mut self, id: usize, f: f64, i: f64) {
         self.attributes[id].set(f, i);
     }
 
-    pub fn insert_particle(&mut self, p: Vector, v: Vector) {
-        self.particles.push( Particle::new(p, v, self.dt) );
+    /// Insert a particle. 
+    pub fn insert_particle(&mut self, position: Vector, velocity: Vector, radius: f64) {
+        self.particles.push( Particle::new(position, velocity, radius, self.dt) );
+        self.number_of_particles += 1;
     }
 
+    /// Get a list of all the particle velocities;
     pub fn velocities(&self) -> Vec<f64> {
         let mut vs = Vec::new();
         for p in &self.particles {
@@ -100,6 +169,7 @@ impl<T: SpatialPartition> Simulator<T> {
         vs
     }
     
+    /// Get a list of all the particle positions;
     pub fn positions(&self) -> Vec<Vector> {
         let mut ps = Vec::new();
         for p in &self.particles {
@@ -108,7 +178,7 @@ impl<T: SpatialPartition> Simulator<T> {
         ps
     }
 
-    // total engery in system
+    /// Get the total engery in system
     pub fn total_energy(&self) -> f64 {
         let mut energy = 0.0;
         for p in &self.particles {
@@ -118,33 +188,6 @@ impl<T: SpatialPartition> Simulator<T> {
         energy
     }
 
-    fn naive_collision_check(&self) -> Vec<Collision> {
-        let mut collisions = Vec::new();
-
-        for i in 0..self.particles.len() {
-            let p = self.particles[i];
-            let p_position = p.get_position();
-
-            for j in (i+1)..self.particles.len() {
-                let q = self.particles[j];
-                let q_position = q.get_position();
-
-                let normal = (q_position - p_position).normalise();
-                let penetration = 2.0*self.radius - p_position.distance( q_position );
-
-                // if circles are overlapping
-                if penetration > 0.0 {
-
-                    // add collision
-                    collisions.push( Collision::new(i, j, penetration, normal) );
-                }
-            }
-        }
-
-        collisions
-    }
-
-
     // solves collisions by applying impulse and adjusting particle locations
     fn solve_collisions(&mut self) {
         let collisions = self.spatial_partition.collision_check_parallel();
@@ -153,7 +196,8 @@ impl<T: SpatialPartition> Simulator<T> {
             
             // update attributes 
             for a in &self.collision_attributes { 
-                self.attributes[*a].collision_update(c.p1, c.p2, &self.particles[c.p1], &self.particles[c.p2]);
+                self.attributes[*a].collision_update(c.p1, c.p2, 
+                                                     &self.particles[c.p1], &self.particles[c.p2]);
             }
                     
             let p = self.particles[c.p1];
@@ -164,16 +208,25 @@ impl<T: SpatialPartition> Simulator<T> {
             // adjust particle positions
             let scale = 0.8;
             let slop = 0.0001;
-            let correction = (f64::max( penetration - slop, 0.0 ) / 2.0) * scale * normal;
-            self.particles[c.p1].set_position( p.get_position() - correction );
-            self.particles[c.p2].set_position( q.get_position() + correction );
+            let correction = f64::max( penetration - slop, 0.0 ) * scale * normal;
+            
+            let p1 = p.radius / ( p.radius + q.radius );
+            let p2 = q.radius / ( p.radius + q.radius );
+
+            self.particles[c.p1].set_position( p.get_position() - correction*p2 );
+            self.particles[c.p2].set_position( q.get_position() + correction*p1 );
 
             // applying impulse
             let relative_velocity = q.get_velocity() - p.get_velocity();
             if relative_velocity.dot(normal) < 0.0 {
-                let j = -( relative_velocity ).dot( normal );
-                self.particles[c.p1].set_velocity( p.get_velocity() - j * normal );
-                self.particles[c.p2].set_velocity( q.get_velocity() + j * normal );
+                let m1 = p.radius * 0.1;
+                let m2 = q.radius * 0.1;
+
+                let j = (-(1.0 + self.particle_restitution) * relative_velocity.dot(normal) ) / (m1+m2);
+                
+                self.particles[c.p1].set_velocity( p.get_velocity() - (j * normal) * m2 );
+                self.particles[c.p2].set_velocity( q.get_velocity() + (j * normal) * m1 );
+                
             }
         }
     }
@@ -208,7 +261,7 @@ impl<T: SpatialPartition> Simulator<T> {
     }
 
 
-    // call from main loop
+    /// Do a simulation step. 
     pub fn update(&mut self) {
         self.solve_collisions();
 
@@ -217,8 +270,9 @@ impl<T: SpatialPartition> Simulator<T> {
         // apply gravity
         for (i, mut p) in &mut self.particles.iter_mut().enumerate() {
             p.verlet( Vector::new(0.0, self.gravity) );
-            Self::boundary_check(p, self.radius, self.restitution, self.width, self.height);
-            self.spatial_partition.insert(i, p.get_position());
+            let r = p.radius;
+            Self::boundary_check(p, r, self.wall_restitution, self.width, self.height);
+            self.spatial_partition.insert(i, p.get_position(), r);
             
             for a in &self.normal_attributes {
                 self.attributes[*a].update(i, &p);

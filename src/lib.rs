@@ -1,3 +1,11 @@
+/*! 
+
+# boltzmann
+
+**boltzmann** is a library for simulating collisions between hard circles.
+
+*/
+
 extern crate rand;
 extern crate rustc_serialize;
 #[macro_use]
@@ -14,3 +22,5 @@ pub mod simulator;
 pub mod attribute;
 pub mod common;
 pub mod drawing;
+
+

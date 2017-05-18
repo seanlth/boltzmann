@@ -111,6 +111,7 @@ fn collision_pairs2(comparisons: Vec<(usize, usize)>) -> Vec<P> {
     v
 }
 
+/*
 #[test]
 fn quadtree_test_collisions_2x2_non_random() {
     let mut quadtree = Quadtree::new(10.0, 10.0, 2.0);
@@ -359,3 +360,5 @@ fn test_collisions_parallel_512x512() {
     
     assert_eq!(e, true)
 }
+
+*/

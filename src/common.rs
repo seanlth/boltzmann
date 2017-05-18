@@ -1,20 +1,27 @@
+//! Miscellaneous functions.
+
 use std::io::prelude::*;
 use std::fs::File;
 use std::cmp;
 
 
-// [start1, end1] => [start2, end2]
-// [start1 - start1, end1 - start1 ] => [start2, end2]
-// [0, end1 - start1] => [start2, end2]
-// [0, end1 - start1 / end1 - start1 ] => [start2, end2]
-// [0, 1] => [start2, end2]
-// [0, 1 * (end2 - start2) ] => [start2, end2]
-// [start2, end2 - start2 + start2] => [start2, end2]
+/// <img src="https://seanlth.github.io/boltzmann/images/scale.svg" width="400px"> <br>
+/// Scales the input x from scale1 to scale2.
+
 pub fn scale(x: f64, scale1: [f64; 2], scale2: [f64; 2]) -> f64 {
     let a = (x - scale1[0]) / (scale1[1] - scale1[0]);
     let b = a * (scale2[1] - scale2[0]);
     b + scale2[0]
 }
+
+/// Ensures the input value x is bounded by the input bounds.
+
+pub fn bound(x: f64, bounds: [f64; 2]) -> f64 {
+    f64::max(bounds[0], f64::min(x, bounds[1]))
+}
+
+/// Maps the value v to an RGB value defined by the jet
+/// colour map.
 
 pub fn grey_to_jet(mut v: f64, min: f64, max: f64) -> (f32, f32, f32)
 {
@@ -45,7 +52,7 @@ pub fn grey_to_jet(mut v: f64, min: f64, max: f64) -> (f32, f32, f32)
 
     (c_r as f32, c_g as f32, c_b as f32)
 }
-
+ 
 
 pub fn cubic_interpolate( a: f64, b: f64, c: f64, d: f64, w: f64 ) -> f64 {
 

@@ -1,4 +1,6 @@
 use std::f64;
+use std::fmt;
+
 
 use std::ops::Add;
 use std::ops::Sub;
@@ -122,5 +124,11 @@ impl Neg for Vector {
 
     fn neg(self) -> Vector {
         Vector::new(-self.x, -self.y)
+    }
+}
+
+impl fmt::Display for Vector {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(x: {}, y: {})", self.x, self.y)
     }
 }

@@ -1,7 +1,7 @@
+//! Particle viewer, density viewer, graph plotter. 
+
 use glium;
 use glium::Program;
-use glium::uniforms::Uniforms;
-use glium::uniforms::EmptyUniforms;
 use glium::backend::glutin_backend::GlutinFacade;
 use glium::VertexBuffer;
 use glium::IndexBuffer;
@@ -18,9 +18,10 @@ use common::scale;
 struct Vertex {
     position: [f32; 2],
     colour: [f32; 4],
+    radius: f32
 }
 
-implement_vertex!(Vertex, position, colour);
+implement_vertex!(Vertex, position, colour, radius);
 
 pub struct Plotter<'a> {
     context: (GlutinFacade, Program),
@@ -69,7 +70,8 @@ impl<'a> Plotter<'a> {
                         
             vertices.push( Vertex {
                 position: [ px, py ],
-                colour: [ 0.0, 1.0, 1.0, 1.0 ]
+                colour: [ 0.0, 1.0, 1.0, 1.0 ],
+                radius: 0.0
             } );
             indices.push(i as u16);
         }
@@ -91,22 +93,21 @@ impl<'a> Plotter<'a> {
 pub struct Particles<'a> {
     context: (GlutinFacade, Program),
     buffer: VertexBuffer<Vertex>,
-    data: Vec<(Vector, (f32, f32, f32))>,
+    data: Vec<(Vector, (f32, f32, f32), f32)>,
     parameters: DrawParameters<'a>,
-    uniforms: glium::uniforms::UniformsStorage<'a, f32, glium::uniforms::UniformsStorage<'a, f32, glium::uniforms::EmptyUniforms>>,
+    uniforms: glium::uniforms::UniformsStorage<'a, f32, glium::uniforms::EmptyUniforms>,
     width: f64,
     height: f64
 }
 
 impl<'a> Particles<'a> {
-    pub fn new(context: (GlutinFacade, Program), data: Vec<(Vector, (f32, f32, f32))>, radius: f64, width: f64, height: f64) -> Particles<'a> {
+    pub fn new(context: (GlutinFacade, Program), data: Vec<(Vector, (f32, f32, f32), f32)>, width: f64, height: f64) -> Particles<'a> {
         let parameters = DrawParameters {
             blend: glium::Blend::alpha_blending(),
             .. Default::default()    
         };
         let uniforms = uniform! {
             u_Aspect: height as f32 / width as f32,
-            radius: 2.0 * radius as f32 / height as f32
         };
                 
         let mut p = Particles {
@@ -122,18 +123,19 @@ impl<'a> Particles<'a> {
         p
     }
         
-    pub fn update(&mut self, data: Vec<(Vector, (f32, f32, f32))>) {
+    pub fn update(&mut self, data: Vec<(Vector, (f32, f32, f32), f32)>) {
         self.data = data.clone();
             
         let mut vertices = Vec::new();
         
-        for (i, &(v, (r, g, b))) in self.data.iter().enumerate() {
+        for (_, &(v, (r, g, b), radius)) in self.data.iter().enumerate() {
             let px = scale(v.x as f64, [0.0, self.width], [-1.0, 1.0]) as f32;
             let py = scale(v.y as f64, [0.0, self.height], [-1.0, 1.0]) as f32;
                         
             vertices.push( Vertex {
                 position: [ px, py ],
-                colour: [ r, g, b, 1.0 ]
+                colour: [ r, g, b, 1.0 ],
+                radius: radius * 2.0 / self.height as f32
             } );
         }
         self.buffer.write(&*vertices);
@@ -171,9 +173,7 @@ impl<'a> Density<'a> {
             u_Aspect: number_of_rows as f32 / number_of_columns as f32,
             radius: 1.0 / (number_of_columns as f32)
         };
-        
-        let len = data.len();
-        
+         
         let mut p = Density {
             buffer: VertexBuffer::empty_dynamic(&context.0, data.len()).unwrap(),
             context: context,
@@ -202,7 +202,8 @@ impl<'a> Density<'a> {
                         
             vertices.push( Vertex {
                 position: [ px, py ],
-                colour: [ red, green, blue, 1.0 ]
+                colour: [ red, green, blue, 1.0 ],
+                radius: 0.0
             } );
         }
         self.buffer.write(&*vertices);
