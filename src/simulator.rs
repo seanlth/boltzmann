@@ -6,7 +6,7 @@ use vector::*;
 use particle::Particle;
 use collision::*;
 use attribute::Attribute;
-use common::*;
+use scale;
 
 
 /// Probability function. 
@@ -18,25 +18,25 @@ pub type Probability = Fn() -> f64;
 pub struct Simulator<T: SpatialPartition> {
     /// The spatial partitioning scheme used for
     /// accelerating collision detection.
-    pub spatial_partition: T,
+    spatial_partition: T,
     /// Number of particles.
-    pub number_of_particles: usize,
+    number_of_particles: usize,
     /// The list of particles.
-    pub particles: Vec<Particle>,
+    particles: Vec<Particle>,
     /// Acceleration due to gravity. 
-    pub gravity: f64,
+    gravity: f64,
     /// The restitution in a particle-particle collision.
-    pub particle_restitution: f64,
+    particle_restitution: f64,
     /// The restitution in a wall-particle collision.
-    pub wall_restitution: f64,
+    wall_restitution: f64,
     /// Simulation domain width.
-    pub width: f64,
+    width: f64,
     /// Simulation domain height.
-    pub height: f64,
+    height: f64,
     /// Maximum allowed speed of a particle.
-    pub max_speed: f64,
+    max_speed: f64,
     /// Timestep.
-    pub dt: f64,
+    dt: f64,
     attributes: Vec<Box<Attribute>>,
     normal_attributes: Vec<usize>,
     collision_attributes: Vec<usize>,

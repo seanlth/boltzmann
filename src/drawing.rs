@@ -12,7 +12,7 @@ use glium::DrawParameters;
 
 use vector::Vector;
 
-use common::scale;
+use scale;
 
 #[derive(Copy, Clone)]
 struct Vertex {

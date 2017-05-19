@@ -4,7 +4,7 @@
 //! step.
 
 use particle::Particle;
-use common::scale;
+use scale;
 
 /// Attribute definition. 
 pub trait Attribute {

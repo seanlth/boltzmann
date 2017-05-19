@@ -1,6 +1,6 @@
 //! Spatial hash implementation.
 
-use common::{scale, bound};
+use {scale, bound};
 use collision::*;
 use vector::Vector;
 use scoped_pool::Pool;

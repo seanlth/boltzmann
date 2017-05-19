@@ -3,7 +3,7 @@
 
 extern crate toml;
 
-use common::read_file;
+use read_file;
 
 #[derive(Debug, RustcDecodable)]
 pub struct Config {
