@@ -9,12 +9,12 @@ name = "boltzmann"
 path = "src/lib.rs"
 
 [dependencies]
-
 rand = "0.3"
 glutin = "0.7.1"
 glium = "*"
 toml = "0.2.1"
 rustc-serialize = "0.3.22"
 scoped-pool = "1"
-
-
+clap = "2.24.2"
+rustyline = "1.0.0"
+commands = "0.0.4"

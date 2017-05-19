@@ -20,7 +20,6 @@ pub mod spatial_hash;
 pub mod quadtree;
 pub mod simulator;
 pub mod attribute;
-pub mod common;
 pub mod drawing;
 
 use std::io::prelude::*;
