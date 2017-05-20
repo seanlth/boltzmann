@@ -69,6 +69,34 @@ impl<T: SpatialPartition> Simulator<T> {
         }
     }
     
+    /// Get a reference to the spatial partition.
+    pub fn spatial_partition(&self) -> &T { &self.spatial_partition }
+
+    /// Get the number of particles.
+    pub fn number_of_particles(&self) -> usize { self.number_of_particles }
+
+    /// Get the current gravity.
+    pub fn gravity(&self) -> f64 { self.gravity }
+
+    /// Get the restitution in particle collision.
+    pub fn particle_restitution(&self) -> f64 { self.particle_restitution }
+
+    /// The restitution in a wall collision.
+    pub fn wall_restitution(&self) -> f64 { self.wall_restitution }
+
+    /// Get the domain width.
+    pub fn width(&self) -> f64 { self.width }
+
+    /// Get the domain height.
+    pub fn height(&self) -> f64 { self.height }
+
+    /// Get the max_speed.
+    pub fn max_speed(&self) -> f64 { self.max_speed }
+
+    /// Get the timestep.
+    pub fn timestep(&self) -> f64 { self.dt }
+
+
     /// Specify the initial conditions manually. 
     pub fn initial_conditions(&mut self, 
                               positions: Vec<Vector>,

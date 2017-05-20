@@ -7,13 +7,14 @@ use read_file;
 
 #[derive(Debug, RustcDecodable)]
 pub struct Config {
+    pub height: Option<f64>,    
+    pub width: Option<f64>,
     pub number_of_particles: Option<usize>,
     pub dt: Option<f64>,
     pub gravity: Option<f64>,
     pub particle_restitution: Option<f64>,
     pub wall_restitution: Option<f64>,
-    pub width: Option<u32>,
-    pub height: Option<u32>,
+    
 }
 
 pub fn read_config(config_path: &str) -> Config {
